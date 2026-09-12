@@ -40,11 +40,11 @@ FALLBACK_SOURCE_SYMBOLS = [
     "MINAUSDT", "UAIUSDT",
 ]
 
-# Current LBank Futures public endpoint is used to determine which requested
-# coins are actually available as SwapU contracts. Price candles are fetched
-# from LBank's public spot Kline endpoint because the current public Futures
-# REST documentation exposes instrument/market data but does not document a
-# Futures Kline REST endpoint.
+# LBank Futures public endpoint is the primary source for contract eligibility.
+# The official public Futures REST documentation exposes the instrument and
+# market-data endpoints, but does not document a historical Futures Kline REST
+# endpoint; the existing candle loader therefore remains on the documented
+# LBank Kline API until LBank exposes a supported historical Futures Kline API.
 LBANK_FUTURES_BASE = os.getenv(
     "LBANK_FUTURES_BASE",
     "https://lbkperp.lbank.com",
@@ -990,20 +990,46 @@ def unwrap_lbank_data(payload):
 
 
 def get_lbank_futures_instruments():
-    """Deprecated compatibility helper.
+    """Return the public LBank SwapU Futures contract list.
 
-    The scanner no longer calls the LBank Futures instrument endpoint because
-    that endpoint can return HTTP 403 from GitHub Actions runners. Eligibility
-    is determined from LBank's public spot trading-pair list instead.
+    LBank documents this endpoint as the public contract-information list.
+    It returns fields such as symbol, baseCurrency, clearCurrency and
+    defaultLeverage.  We use it as the primary source for symbol eligibility
+    so coins are resolved against Futures rather than Spot.
     """
-    return []
+    payload = lbank_json_get(
+        LBANK_FUTURES_BASE,
+        "/cfd/openApi/v1/pub/instrument",
+        {"productGroup": LBANK_PRODUCT_GROUP},
+    )
+    data = unwrap_lbank_data(payload)
+    if not isinstance(data, list):
+        raise RuntimeError(f"Unexpected LBank Futures instrument response: {payload}")
+
+    rows = []
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        symbol = str(item.get("symbol") or "").strip().upper()
+        if not symbol:
+            continue
+        rows.append(item)
+
+    if not rows:
+        raise RuntimeError("LBank Futures instrument list is empty")
+
+    print(
+        f"LBank Futures contract list loaded from {LBANK_FUTURES_BASE}: "
+        f"{len(rows)} {LBANK_PRODUCT_GROUP} contracts"
+    )
+    return rows
 
 
 def get_lbank_spot_pairs():
-    """Return LBank's public spot trading pairs.
+    """Return LBank public spot pairs only as a compatibility fallback.
 
-    This is the authoritative public list used to decide whether a requested
-    coin exists on LBank. We try both documented/current hosts.
+    Futures is the primary source now. Spot is retained only so a temporary
+    Futures endpoint outage does not stop the scanner completely.
     """
     last_error = None
     for base in (LBANK_SPOT_BASE, LBANK_SPOT_FALLBACK_BASE):
@@ -1025,7 +1051,7 @@ def get_lbank_spot_pairs():
                         if pair:
                             pairs.append(str(pair))
                 if pairs:
-                    print(f"LBank spot pair list loaded from {base}: {len(pairs)} pairs")
+                    print(f"LBank Spot fallback pair list loaded from {base}: {len(pairs)} pairs")
                     return base, pairs
 
             last_error = RuntimeError(
@@ -1033,10 +1059,10 @@ def get_lbank_spot_pairs():
             )
         except Exception as error:
             last_error = error
-            print(f"LBank spot pair request failed on {base}: {error}")
+            print(f"LBank spot fallback request failed on {base}: {error}")
 
     raise RuntimeError(
-        "Could not retrieve LBank public trading-pair list from either API host. "
+        "Could not retrieve LBank public Spot trading-pair list for fallback. "
         f"Last error: {last_error}"
     )
 
@@ -1050,13 +1076,12 @@ def normalize_lbank_pair(value):
 
 
 def get_lbank_crypto_symbols():
-    """Resolve requested symbols strictly against LBank public spot pairs.
+    """Resolve requested symbols against LBank Futures SwapU contracts.
 
-    The old implementation queried the Futures instrument endpoint first. That
-    endpoint is public in the documentation but can return HTTP 403 from a
-    GitHub-hosted runner. For this scanner we do not need that endpoint: the
-    public spot pair list is enough to filter the user's requested coin list,
-    and the same public LBank API provides 4H/1D Klines.
+    The user's coins.txt is treated as the source of requested base symbols.
+    Matching is performed against LBank's public Futures instrument list, not
+    the Spot pair list. This means a coin can be selected when it has a
+    USDT-margined perpetual Futures contract even if its Spot pair is absent.
     """
     requested = read_source_symbols()
     requested_bases = []
@@ -1068,63 +1093,119 @@ def get_lbank_crypto_symbols():
             seen.add(base)
             requested_bases.append(base)
 
-    spot_base_url, spot_pairs = get_lbank_spot_pairs()
-
-    # Only USDT spot pairs are considered. This prevents unrelated BTC/ETH
-    # quote pairs from creating duplicate candidates for the same coin.
-    spot_map = {}
-    for pair in spot_pairs:
-        normalized = normalize_lbank_pair(pair)
-        if not normalized.endswith("_usdt"):
-            continue
-        base = normalized[:-5].upper()
-        if base:
-            spot_map.setdefault(base, normalized)
-
-    rows = []
-    missing = []
-
-    for base in requested_bases:
-        spot_pair = spot_map.get(base)
-        if not spot_pair:
-            missing.append(base)
-            continue
-
-        rows.append(
-            {
-                "symbol": spot_pair,
-                "name": base,
-                "source_symbol": base + "USDT",
-                "futures_symbol": "",
-                "base_currency": base,
-                "clear_currency": "USDT",
-                "price_tick": None,
-                "volume_tick": None,
-                "min_order_volume": None,
-                "min_order_cost": None,
-                "default_leverage": None,
-                "spot_base_url": spot_base_url,
-            }
-        )
-
     order = {base: i for i, base in enumerate(requested_bases)}
-    rows.sort(
-        key=lambda row: order.get(
-            normalize_requested_symbol(row["source_symbol"]), 999999
-        )
-    )
 
-    print(f"LBank requested symbols : {len(requested_bases)}")
-    print(f"LBank spot matched      : {len(rows)}")
-    print(f"LBank spot missing      : {len(missing)}")
+    try:
+        futures_items = get_lbank_futures_instruments()
+        futures_map = {}
 
-    if missing:
-        print("Not listed on LBank Spot: " + ", ".join(missing))
+        for item in futures_items:
+            symbol = str(item.get("symbol") or "").strip().upper()
+            base_currency = normalize_requested_symbol(
+                item.get("baseCurrency") or symbol
+            )
+            clear_currency = str(
+                item.get("clearCurrency") or item.get("priceCurrency") or ""
+            ).strip().upper()
 
-    if rows:
-        print("Final LBank symbols: " + ", ".join(row["symbol"] for row in rows))
+            # We specifically want USDT-margined perpetual-style SwapU
+            # contracts. Prefer the explicit currency field, while also
+            # accepting the conventional XXXUSDT symbol format.
+            if clear_currency and clear_currency != "USDT":
+                continue
+            if not symbol.endswith("USDT"):
+                continue
+            if not base_currency:
+                base_currency = normalize_requested_symbol(symbol)
 
-    return rows
+            futures_map.setdefault(base_currency, item)
+
+        rows = []
+        missing = []
+        for base in requested_bases:
+            item = futures_map.get(base)
+            if not item:
+                missing.append(base)
+                continue
+
+            symbol = str(item.get("symbol") or "").strip().upper()
+            rows.append(
+                {
+                    "symbol": normalize_lbank_pair(symbol),
+                    "name": base,
+                    "source_symbol": base + "USDT",
+                    "futures_symbol": symbol,
+                    "base_currency": base,
+                    "clear_currency": str(
+                        item.get("clearCurrency") or "USDT"
+                    ).upper(),
+                    "price_tick": item.get("priceTick"),
+                    "volume_tick": item.get("volumeTick"),
+                    "min_order_volume": item.get("minOrderVolume"),
+                    "min_order_cost": item.get("minOrderCost"),
+                    "default_leverage": item.get("defaultLeverage"),
+                    "spot_base_url": "",
+                }
+            )
+
+        rows.sort(key=lambda row: order.get(row["base_currency"], 999999))
+
+        print(f"LBank requested symbols : {len(requested_bases)}")
+        print(f"LBank Futures matched   : {len(rows)}")
+        print(f"LBank Futures missing   : {len(missing)}")
+        if missing:
+            print("Not listed on LBank Futures: " + ", ".join(missing))
+        if rows:
+            print("Final LBank Futures symbols: " + ", ".join(row["futures_symbol"] for row in rows))
+
+        return rows
+
+    except Exception as futures_error:
+        print(f"LBank Futures symbol list failed: {futures_error}")
+        print("Falling back to LBank Spot symbol list for this run.")
+
+        spot_base_url, spot_pairs = get_lbank_spot_pairs()
+        spot_map = {}
+        for pair in spot_pairs:
+            normalized = normalize_lbank_pair(pair)
+            if not normalized.endswith("_usdt"):
+                continue
+            base = normalized[:-5].upper()
+            if base:
+                spot_map.setdefault(base, normalized)
+
+        rows = []
+        missing = []
+        for base in requested_bases:
+            spot_pair = spot_map.get(base)
+            if not spot_pair:
+                missing.append(base)
+                continue
+            rows.append(
+                {
+                    "symbol": spot_pair,
+                    "name": base,
+                    "source_symbol": base + "USDT",
+                    "futures_symbol": "",
+                    "base_currency": base,
+                    "clear_currency": "USDT",
+                    "price_tick": None,
+                    "volume_tick": None,
+                    "min_order_volume": None,
+                    "min_order_cost": None,
+                    "default_leverage": None,
+                    "spot_base_url": spot_base_url,
+                }
+            )
+
+        rows.sort(key=lambda row: order.get(row["base_currency"], 999999))
+        print(f"LBank Spot fallback matched: {len(rows)}")
+        print(f"LBank Spot fallback missing: {len(missing)}")
+        if missing:
+            print("Not listed on LBank Spot fallback: " + ", ".join(missing))
+        if rows:
+            print("Final LBank Spot fallback symbols: " + ", ".join(row["symbol"] for row in rows))
+        return rows
 
 
 # =========================================================
