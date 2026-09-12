@@ -1,0 +1,22 @@
+{
+  "initialized": false,
+  "last_event": {},
+  "last_signal": {},
+  "active": {},
+  "closed_trades": [],
+  "deliveries": {},
+  "daily_stats": {},
+  "monthly_stats": {},
+  "portfolio": {
+    "initial_balance": 100.0,
+    "balance": 100.0,
+    "next_trade_number": 1,
+    "total_realized_pnl": 0.0,
+    "period_opening_balances": {},
+    "equity_curve": []
+  },
+  "telegram_update_offset": 0,
+  "last_daily_report": "",
+  "last_monthly_report": "",
+  "last_weekly_report": ""
+}
