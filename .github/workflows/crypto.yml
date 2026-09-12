@@ -15,7 +15,7 @@ concurrency:
 jobs:
   scan:
     runs-on: ubuntu-latest
-
+    timeout-minutes: 20
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -26,6 +26,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: requirements-crypto.txt
 
       - name: Install dependencies
         run: |
@@ -39,6 +41,8 @@ jobs:
           TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
           COINS_FILE: coins.txt
           LBANK_PRODUCT_GROUP: SwapU
+          LBANK_SCAN_WORKERS: "16"
+          LBANK_TIMEOUT: "8"
         run: |
           python crypto_tradeiq.py
 
@@ -46,14 +50,11 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@github.com"
-
           git add kcex_signal_state.json
-
           if git diff --cached --quiet; then
             echo "No state changes to commit."
             exit 0
           fi
-
           git commit -m "Update LBank scanner state"
           git pull --rebase origin main
           git push origin main
