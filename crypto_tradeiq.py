@@ -1,14 +1,11 @@
 import os
 import re
 import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 
 import pandas as pd
 import requests
-try:
-    from websockets.sync.client import connect as ws_connect
-except Exception:
-    ws_connect = None
 
 STATE_FILE = "kcex_signal_state.json"
 
@@ -44,11 +41,13 @@ FALLBACK_SOURCE_SYMBOLS = [
     "MINAUSDT", "UAIUSDT",
 ]
 
-# LBank Futures is used for both contract eligibility and candle retrieval.
-# The current official Futures REST manual documents instrument/market-data
-# endpoints but not a historical Kline REST route; the Futures WebSocket host
-# is documented separately. This build therefore requests K-lines directly
-# from the Futures WebSocket and NEVER falls back to Spot candles.
+# LBank Futures public endpoint is used to determine which requested coins
+# are actually available as SwapU contracts.
+# NOTE: LBank's current official Futures REST documentation does not expose a
+# historical Futures Kline endpoint. The scanner therefore still uses the
+# existing LBank Spot Kline endpoint for historical candles. This patch fixes
+# the Futures instrument lookup / 403 handling and removes the silent Spot
+# symbol-list fallback.
 LBANK_FUTURES_BASE = os.getenv(
     "LBANK_FUTURES_BASE",
     "https://lbkperp.lbank.com",
@@ -67,9 +66,8 @@ LBANK_SPOT_FALLBACK_BASE = os.getenv(
 ).rstrip("/")
 
 LBANK_PRODUCT_GROUP = os.getenv("LBANK_PRODUCT_GROUP", "SwapU")
-LBANK_FUTURES_WS = os.getenv("LBANK_FUTURES_WS", "wss://lbkperpws.lbank.com/ws")
 
-LBank_TIMEOUT = int(os.getenv("LBANK_TIMEOUT", "30"))
+LBank_TIMEOUT = int(os.getenv("LBANK_TIMEOUT", "10"))
 LBank_4H_BARS = int(os.getenv("LBANK_4H_BARS", "400"))
 LBank_1D_BARS = int(os.getenv("LBANK_1D_BARS", "800"))
 
@@ -1238,214 +1236,133 @@ def get_lbank_crypto_symbols():
 # LBANK KLINE DATA
 # =========================================================
 
-def _parse_futures_kline_message(message):
-    """Extract Futures kline rows from the LBank Futures WebSocket response.
-
-    LBank documents the Futures WebSocket host but does not publish the kline
-    message schema in the current Futures REST manual. The public LBank V2
-    market-data protocol documents the `request/kbar` envelope and OHLC fields;
-    this parser accepts both the documented kbar object shape and common array
-    wrappers so the scanner fails closed if the Futures service changes shape.
-    """
-    if isinstance(message, str):
-        try:
-            message = json.loads(message)
-        except Exception:
-            return []
-
-    if not isinstance(message, dict):
-        return []
-
-    # Application-level heartbeat used by LBank's WebSocket APIs.
-    if str(message.get("action", "")).lower() == "ping":
-        return []
-
-    candidates = []
-    for key in ("data", "result", "rows", "list", "klines", "kline", "kbar"):
-        value = message.get(key)
-        if isinstance(value, list):
-            candidates.extend(value)
-        elif isinstance(value, dict):
-            candidates.append(value)
-
-    # Some servers wrap a single kbar under the top-level `kbar` key.
-    if isinstance(message.get("kbar"), dict):
-        candidates.append(message["kbar"])
-
-    rows = []
-    for item in candidates:
-        if isinstance(item, (list, tuple)) and len(item) >= 5:
-            try:
-                ts = float(item[0])
-                if ts > 10_000_000_000:
-                    ts /= 1000.0
-                rows.append((ts, float(item[1]), float(item[2]), float(item[3]), float(item[4]), float(item[5]) if len(item) > 5 else 0.0))
-            except (TypeError, ValueError):
-                continue
-            continue
-
-        if not isinstance(item, dict):
-            continue
-        # Documented V2 kbar fields: t,o,h,l,c,v.
-        raw_t = item.get("t", item.get("time", item.get("ts", item.get("timestamp"))))
-        raw_o = item.get("o", item.get("open"))
-        raw_h = item.get("h", item.get("high"))
-        raw_l = item.get("l", item.get("low"))
-        raw_c = item.get("c", item.get("close"))
-        raw_v = item.get("v", item.get("volume", 0))
-        try:
-            if isinstance(raw_t, str) and not raw_t.replace(".", "", 1).isdigit():
-                ts = pd.Timestamp(raw_t, tz="UTC").timestamp()
-            else:
-                ts = float(raw_t)
-                if ts > 10_000_000_000:
-                    ts /= 1000.0
-            rows.append((ts, float(raw_o), float(raw_h), float(raw_l), float(raw_c), float(raw_v or 0)))
-        except (TypeError, ValueError):
-            continue
-    return rows
-
-
-def _futures_ws_request_klines(symbol, size, interval_type):
-    """Request historical candles from LBank's Futures WebSocket service.
-
-    IMPORTANT: this function never falls back to Spot. If the Futures socket
-    does not return valid candles, the symbol is skipped instead of mixing
-    spot prices into a Futures strategy.
-    """
-    if ws_connect is None:
-        raise RuntimeError("websockets package is required for LBank Futures Kline")
-
-    interval_seconds = {
-        "minute1": 60,
-        "minute5": 5 * 60,
-        "minute15": 15 * 60,
-        "minute30": 30 * 60,
-        "hour1": 60 * 60,
-        "hour4": 4 * 60 * 60,
-        "hour8": 8 * 60 * 60,
-        "hour12": 12 * 60 * 60,
-        "day1": 24 * 60 * 60,
-        "week1": 7 * 24 * 60 * 60,
-    }
-    interval_seconds = interval_seconds.get(interval_type, 4 * 60 * 60)
-    requested_size = min(max(int(size), 30), 2000)
-    now = int(datetime.now(timezone.utc).timestamp())
-    start = now - (requested_size + 10) * interval_seconds
-    end = now
-
-    request = {
-        "action": "request",
-        "request": "kbar",
-        "kbar": "4hr" if interval_type == "hour4" else interval_type,
-        "pair": str(symbol).replace("_", "").upper(),
-        "start": str(start),
-        "end": str(end),
-        "size": str(requested_size),
-    }
-
-    rows = []
-    with ws_connect(
-        LBANK_FUTURES_WS,
-        open_timeout=LBank_TIMEOUT,
-        close_timeout=5,
-        ping_interval=20,
-        ping_timeout=20,
-        max_size=8 * 1024 * 1024,
-    ) as ws:
-        ws.send(json.dumps(request, separators=(",", ":")))
-        deadline = datetime.now(timezone.utc).timestamp() + LBank_TIMEOUT
-        while datetime.now(timezone.utc).timestamp() < deadline:
-            timeout_left = max(1.0, deadline - datetime.now(timezone.utc).timestamp())
-            try:
-                raw = ws.recv(timeout=timeout_left)
-            except TimeoutError:
-                break
-            except Exception:
-                break
-
-            try:
-                obj = json.loads(raw) if isinstance(raw, str) else raw
-            except Exception:
-                continue
-
-            # Handle LBank application heartbeat without confusing it with data.
-            if isinstance(obj, dict) and str(obj.get("action", "")).lower() == "ping":
-                pong_value = obj.get("ping", "")
-                ws.send(json.dumps({"action": "pong", "pong": pong_value}, separators=(",", ":")))
-                continue
-
-            parsed = _parse_futures_kline_message(obj)
-            if parsed:
-                rows.extend(parsed)
-                # A historical request can be delivered in one message. Once
-                # we have enough bars there is no reason to keep the socket open.
-                if len(rows) >= requested_size:
-                    break
-
-    if not rows:
-        raise RuntimeError(f"LBank Futures WebSocket returned no kline rows for {symbol}")
-
-    dedup = {}
-    for row in rows:
-        dedup[int(round(row[0]))] = row
-    rows = [dedup[k] for k in sorted(dedup)]
-    if len(rows) < 30:
-        raise RuntimeError(f"LBank Futures WebSocket returned only {len(rows)} kline rows for {symbol}")
-
-    return rows[-requested_size:]
-
-
 def _lbank_kline(symbol, size, interval_type):
-    """Build OHLC data strictly from LBank Futures SwapU candles."""
-    try:
-        rows = _futures_ws_request_klines(symbol, size, interval_type)
-        parsed = []
-        for ts, o, h, l, c, v in rows:
-            parsed.append({
-                "Time": pd.to_datetime(ts, unit="s", utc=True),
-                "Open": o,
-                "High": h,
-                "Low": l,
-                "Close": c,
-                "Volume": v,
-            })
-        df = (
-            pd.DataFrame(parsed)
-            .drop_duplicates(subset=["Time"])
-            .sort_values("Time")
-            .set_index("Time")
-        )
-        df = df[["Open", "High", "Low", "Close"]].dropna().copy()
-        # The latest candle can still be open; the strategy only uses closed candles.
-        if len(df) > 1:
-            df = df.iloc[:-1].copy()
-        return df
-    except Exception as error:
-        print(f"LBank Futures Kline request failed: {symbol} {interval_type}: {error}")
-        return None
+    # Official LBank spot Kline format:
+    # [timestamp, open, high, low, close, volume]
+    # `time` is required by the documented endpoint.
+    last_error = None
+
+    for base in (LBANK_SPOT_BASE, LBANK_SPOT_FALLBACK_BASE):
+        try:
+            requested_size = min(int(size), 2000)
+
+            # LBank's REST Kline `time` parameter is the timestamp from which
+            # bars are returned forward. Using "now" asks for bars after the
+            # current moment and can therefore return an empty list.
+            interval_seconds = {
+                "minute1": 60,
+                "minute5": 5 * 60,
+                "minute15": 15 * 60,
+                "minute30": 30 * 60,
+                "hour1": 60 * 60,
+                "hour4": 4 * 60 * 60,
+                "hour8": 8 * 60 * 60,
+                "hour12": 12 * 60 * 60,
+                "day1": 24 * 60 * 60,
+                "week1": 7 * 24 * 60 * 60,
+                "month1": 30 * 24 * 60 * 60,
+            }.get(interval_type, 4 * 60 * 60)
+
+            start_time = int(
+                datetime.now(timezone.utc).timestamp()
+            ) - (requested_size + 10) * interval_seconds
+
+            payload = lbank_json_get(
+                base,
+                "/v2/kline.do",
+                {
+                    "symbol": symbol,
+                    "size": requested_size,
+                    "type": interval_type,
+                    "time": start_time,
+                },
+            )
+
+            data = payload.get("data") if isinstance(payload, dict) else None
+            if not isinstance(data, list):
+                raise RuntimeError(
+                    f"Invalid Kline response for {symbol}: {payload}"
+                )
+
+            if not data:
+                raise RuntimeError(
+                    f"Empty Kline response for {symbol} {interval_type}; "
+                    f"requested {requested_size} bars from {start_time}"
+                )
+
+            rows = []
+            for item in data:
+                if not isinstance(item, (list, tuple)) or len(item) < 5:
+                    continue
+                try:
+                    ts = float(item[0])
+                    # LBank documents seconds, but tolerate milliseconds.
+                    if ts > 10_000_000_000:
+                        ts /= 1000.0
+
+                    rows.append(
+                        {
+                            "Time": pd.to_datetime(ts, unit="s", utc=True),
+                            "Open": float(item[1]),
+                            "High": float(item[2]),
+                            "Low": float(item[3]),
+                            "Close": float(item[4]),
+                        }
+                    )
+                except (TypeError, ValueError):
+                    continue
+
+            if not rows:
+                raise RuntimeError(f"No usable Kline rows for {symbol}")
+
+            df = (
+                pd.DataFrame(rows)
+                .drop_duplicates(subset=["Time"])
+                .sort_values("Time")
+                .set_index("Time")
+            )
+
+            needed = ["Open", "High", "Low", "Close"]
+            df = df[needed].dropna().copy()
+
+            # The latest 4H/day candle can still be in progress. The strategy
+            # must only work on fully completed candles.
+            if len(df) > 1:
+                df = df.iloc[:-1].copy()
+
+            return df
+
+        except Exception as error:
+            last_error = error
+            print(
+                f"LBank Kline request failed: "
+                f"{symbol} {interval_type} via {base}: {error}"
+            )
+
+    return None
+
+
+_RUN_DATA_CACHE = {}
+_RUN_DATA_CACHE_LOCK = __import__("threading").Lock()
+
+def _cached_download(key, loader):
+    with _RUN_DATA_CACHE_LOCK:
+        if key in _RUN_DATA_CACHE:
+            return _RUN_DATA_CACHE[key]
+    value = loader()
+    with _RUN_DATA_CACHE_LOCK:
+        _RUN_DATA_CACHE[key] = value
+    return value
 
 
 def download_4h(symbol):
-    return _lbank_kline(
-        normalize_lbank_pair(symbol),
-        LBank_4H_BARS,
-        "hour4",
-    )
+    key = ("4h", normalize_lbank_pair(symbol))
+    return _cached_download(key, lambda: _lbank_kline(key[1], LBank_4H_BARS, "hour4"))
 
 
 def download_1d(symbol):
-    df = _lbank_kline(
-        normalize_lbank_pair(symbol),
-        LBank_1D_BARS,
-        "day1",
-    )
-
-    if df is None:
-        return None
-
-    # _lbank_kline already removes the current incomplete daily candle.
-    return df
+    key = ("1d", normalize_lbank_pair(symbol))
+    return _cached_download(key, lambda: _lbank_kline(key[1], LBank_1D_BARS, "day1"))
 
 
 def latest_daily_order(df):
@@ -2843,46 +2760,32 @@ def main():
 
     lbank_symbols = get_lbank_crypto_symbols()
 
+    workers = max(1, min(int(os.getenv("LBANK_SCAN_WORKERS", "10")), 20))
+    print(f"LBank parallel scan workers: {workers}")
+
+    results = {}
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        future_map = {executor.submit(download_4h, info["symbol"]): info for info in lbank_symbols}
+        for future in as_completed(future_map):
+            info = future_map[future]
+            symbol = info["symbol"]
+            try:
+                results[symbol] = future.result()
+            except Exception as error:
+                results[symbol] = None
+                print(f"{symbol}: ERROR: {error}")
+
     for info in lbank_symbols:
-
-        symbol = info[
-            "symbol"
-        ]
-
+        symbol = info["symbol"]
+        df = results.get(symbol)
+        if df is None or len(df) < 30:
+            print(f"{symbol}: insufficient data")
+            continue
+        print(f"{symbol} rows={len(df)}")
         try:
-
-            df = download_4h(
-                symbol
-            )
-
-            if (
-                df is None
-                or len(df) < 30
-            ):
-
-                print(
-                    f"{symbol}: "
-                    "insufficient data"
-                )
-
-                continue
-
-            print(
-                f"{symbol} rows={len(df)}"
-            )
-
-            analyze_symbol(
-                state,
-                info,
-                df,
-            )
-
+            analyze_symbol(state, info, df)
         except Exception as error:
-
-            print(
-                f"{symbol}: ERROR: "
-                f"{error}"
-            )
+            print(f"{symbol}: ERROR: {error}")
 
     # گزارش روزانه
     if not state[
