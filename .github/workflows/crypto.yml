@@ -1,26 +1,34 @@
-name: LBank Crypto Scanner
+name: TradeIQ Crypto Scanner
 
 on:
   schedule:
-    - cron: "0 * * * *"
+    # Run every 5 minutes so TP/SL monitoring is active between 4H candles.
+    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 permissions:
   contents: write
 
+# IMPORTANT: scanner and Telegram command worker use the same state file.
+# They must never modify/read different revisions at the same time.
 concurrency:
-  group: lbank-crypto-scanner
+  group: tradeiq-crypto-state
   cancel-in-progress: false
 
 jobs:
   scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Sync latest main
+        run: |
+          git fetch origin main
+          git reset --hard origin/main
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -34,19 +42,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-crypto.txt
 
-      - name: Run LBank scanner
+      - name: Run crypto scanner
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
-          COINS_FILE: coins.txt
-          LBANK_PRODUCT_GROUP: SwapU
           LBANK_SCAN_WORKERS: "16"
-          LBANK_TIMEOUT: "8"
-        run: |
-          python crypto_tradeiq.py
+        run: python crypto_tradeiq.py
 
-      - name: Save signal state
+      - name: Save trading state
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@github.com"
@@ -55,6 +59,6 @@ jobs:
             echo "No state changes to commit."
             exit 0
           fi
-          git commit -m "Update LBank scanner state"
+          git commit -m "Update crypto trading state"
           git pull --rebase origin main
           git push origin main
