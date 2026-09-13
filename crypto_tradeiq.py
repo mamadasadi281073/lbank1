@@ -97,6 +97,7 @@ TP8_PERCENT = 20.0
 STARTING_BALANCE = 200.0
 FIXED_MARGIN = 10.0
 LEVERAGE = 10.0
+MAX_OPEN_POSITIONS = 5
 
 # Maximum allowed distance between the signal event close and the
 # selected Order Block boundary. Kept identical to the original filter.
@@ -482,7 +483,7 @@ def get_monthly_stats(
 
 def get_week_start(dt):
     # هفته از دوشنبه شروع می‌شود.
-    monday = dt - pd.Timedelta(days=dt.weekday())
+    monday = dt - pd.Timedelta(days=int(dt.weekday()))
     return monday.strftime("%Y-%m-%d")
 
 
@@ -1878,6 +1879,10 @@ def allocate_trade(state):
     margin = FIXED_MARGIN
     notional = margin * LEVERAGE
 
+    # Never exceed the configured maximum number of simulated open positions.
+    if len(state.get("active", {})) >= MAX_OPEN_POSITIONS:
+        raise RuntimeError(f"Maximum open positions reached ({MAX_OPEN_POSITIONS}).")
+
     # Always recover a valid unique number, even if an old state file was
     # manually edited or contains a missing/invalid next_trade_number.
     used = []
@@ -2115,8 +2120,13 @@ def check_take_profits(state, info, df):
     active = state["active"].get(info["symbol"])
     if not active or len(df) < 2:
         return
-    high = float(df["High"].iloc[-2])
-    low = float(df["Low"].iloc[-2])
+    # TP is monitored from the newest available candle so the 5-minute
+    # GitHub Actions worker can report an intrabar TP hit without waiting
+    # for the 4H candle to close. Signal generation itself still uses only
+    # completed 4H candles.
+    monitor_idx = -1
+    high = float(df["High"].iloc[monitor_idx])
+    low = float(df["Low"].iloc[monitor_idx])
     try:
         entry = float(active["entry_price"])
         side = active["side"]
@@ -2169,7 +2179,7 @@ def check_take_profits(state, info, df):
         print(f"{info['symbol']}: {tp_name} hit at {tp_price:.12g}; SL -> {new_sl:.12g}")
 
         if tp_name == "TP40":
-            closed = close_trade(state, info, active, tp_price, "FULL TP (TP40)", df.index[-2].isoformat())
+            closed = close_trade(state, info, active, tp_price, "FULL TP (TP40)", df.index[monitor_idx].isoformat())
             print(f"{info['symbol']}: TP40 / Full TP closed trade #{closed.get('trade_number')}")
             return
 
@@ -2182,7 +2192,14 @@ def check_stop(state, info, df):
     active = state["active"].get(info["symbol"])
     if not active or len(df) < 2:
         return
+
+    # User rule: once TP1 has been reached, never send a later SL message
+    # for that signal. Higher TP levels continue to be monitored.
+    if active.get("tp1_hit", False):
+        return
+
     try:
+        # SL is based on the close of a fully completed 4H candle.
         close = float(df["Close"].iloc[-2])
         sl = float(active.get("current_sl", active.get("sl")))
         entry = float(active["entry_price"])
@@ -2421,7 +2438,7 @@ def previous_week_start():
     now = utc_datetime()
     current_week_start = (
         now
-        - pd.Timedelta(days=now.weekday())
+        - pd.Timedelta(days=int(now.weekday()))
     ).replace(
         hour=0,
         minute=0,
@@ -2671,7 +2688,13 @@ def analyze_symbol(state, info, df):
     else:
         entry_price = float(signal["zone_high"])
 
-    trade_number, margin, notional = allocate_trade(state)
+    try:
+        trade_number, margin, notional = allocate_trade(state)
+    except RuntimeError as error:
+        print(f"{info['symbol']}: signal skipped: {error}")
+        save_state(state)
+        return
+
     text = signal_text(info, signal, trade_number, margin, notional)
     # TP1 is the button that reveals TP3 through TP40. TP2 remains visible in the main message.
     reply_markup = {
