@@ -1,16 +1,13 @@
-name: TradeIQ Crypto Scanner
+name: TradeIQ Binance Crypto Scanner
 
 on:
   schedule:
-    # Run every 5 minutes so TP/SL monitoring is active between 4H candles.
     - cron: "*/5 * * * *"
   workflow_dispatch:
 
 permissions:
   contents: write
 
-# IMPORTANT: scanner and Telegram command worker use the same state file.
-# They must never modify/read different revisions at the same time.
 concurrency:
   group: tradeiq-crypto-state
   cancel-in-progress: false
@@ -18,7 +15,6 @@ concurrency:
 jobs:
   scan:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -42,12 +38,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-crypto.txt
 
-      - name: Run crypto scanner
+      - name: Run Binance scanner
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
-          LBANK_SCAN_WORKERS: "16"
+          BINANCE_SCAN_WORKERS: "16"
         run: python crypto_tradeiq.py
 
       - name: Save trading state
@@ -59,6 +55,6 @@ jobs:
             echo "No state changes to commit."
             exit 0
           fi
-          git commit -m "Update crypto trading state"
+          git commit -m "Update Binance trading state"
           git pull --rebase origin main
           git push origin main
