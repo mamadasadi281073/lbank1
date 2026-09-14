@@ -10,66 +10,27 @@ import requests
 STATE_FILE = "kcex_signal_state.json"
 
 # =========================
-# LBank SOURCE SYMBOLS
+# BINANCE FUTURES SOURCE
 # =========================
-# The scanner reads the symbols you want to scan from coins.txt.
-# One symbol per line is expected. Examples:
-# BTC
-# BTCUSDT
-# btc_usdt
-#
-# If COINS_FILE does not exist, the embedded fallback list below is used.
+# Public market-data only. No Binance account/API key is required.
+# GitHub Actions is used as the execution environment so the scanner does
+# not depend on opening Binance in the user's local browser/network.
 COINS_FILE = os.getenv("COINS_FILE", "coins.txt")
 
 FALLBACK_SOURCE_SYMBOLS = [
-    "DGAIUSDT", "WINUSDT", "DMCUSDT", "CTCUSDT", "DEBITUSDT",
-    "PURRUSDT", "QKCUSDT", "ALIGNUSDT", "CPOOLUSDT", "PUFFERUSDT",
-    "HMMUSDT", "KLLUSDT", "COPPERINUUSDT", "PROLOGUEUSDT", "PISTACIOUSDT",
-    "BUNUSDT", "CC1USDT", "CHEEMSUSDT", "BPUSDT", "BLENDUSDT",
-    "SPACEHOODUSDT", "CLANUSDT", "BISCOTTIUSDT", "MOOUSDT", "STONKEXUSDT",
-    "TOADUSDT", "HOOKARUSDT", "FATCOINUSDT", "CPUSDT", "PAIRUSDT",
-    "DELTAUSDT", "FLORKBSCUSDT", "SWARMUSDT", "MAVIAUSDT", "DNUSDT",
-    "SOONUSDT", "SUEUSDT", "GGUSDT", "LQTYUSDT", "CTOUSDT",
-    "OFCUSDT", "NUDESUSDT", "BELUSDT", "OGNUSDT", "BLUECHIPUSDT",
-    "ARPAUSDT", "MAVUSDT", "TURTLEUSDT", "GTCUSDT", "CARVUSDT",
-    "BROCCLIUSDT", "TAIKOUSDT", "SPELLUSDT", "EYEUSDT", "DOLOUSDT",
-    "DRIFTUSDT", "DYMUSDT", "TMXUSDT", "BUILDUSDT", "ROBINUSDT",
-    "BENUSDT", "ZCATUSDT", "FONEUSDT", "SQDUSDT", "YGGUSDT",
-    "TAGUSDT", "FUNUSDT", "RONUSDT", "GOATUSDT", "PIPEDOGUSDT",
-    "ZIGUSDT", "AGLDUSDT", "MERLUSDT", "FHEUSDT", "JCTUSDT",
-    "ZBTUSDT", "ZZZUSDT", "YBUSDT", "STBLUSDT", "TACUSDT",
-    "MINAUSDT", "UAIUSDT",
+    "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT",
+    "ADAUSDT", "DOGEUSDT", "AVAXUSDT", "LINKUSDT", "DOTUSDT",
 ]
 
-# LBank Futures public endpoint is used to determine which requested coins
-# are actually available as SwapU contracts.
-# NOTE: LBank's current official Futures REST documentation does not expose a
-# historical Futures Kline endpoint. The scanner therefore still uses the
-# existing LBank Spot Kline endpoint for historical candles. This patch fixes
-# the Futures instrument lookup / 403 handling and removes the silent Spot
-# symbol-list fallback.
-LBANK_FUTURES_BASE = os.getenv(
-    "LBANK_FUTURES_BASE",
-    "https://lbkperp.lbank.com",
+BINANCE_FUTURES_BASE = os.getenv(
+    "BINANCE_FUTURES_BASE",
+    "https://fapi.binance.com",
 ).rstrip("/")
 
-# LBank's current general API host. A fallback to the legacy documented host
-# is kept for environments where the newer hostname is unavailable.
-LBANK_SPOT_BASE = os.getenv(
-    "LBANK_SPOT_BASE",
-    "https://api.lbkex.com",
-).rstrip("/")
-
-LBANK_SPOT_FALLBACK_BASE = os.getenv(
-    "LBANK_SPOT_FALLBACK_BASE",
-    "https://api.lbank.info",
-).rstrip("/")
-
-LBANK_PRODUCT_GROUP = os.getenv("LBANK_PRODUCT_GROUP", "SwapU")
-
-LBank_TIMEOUT = int(os.getenv("LBANK_TIMEOUT", "10"))
-LBank_4H_BARS = int(os.getenv("LBANK_4H_BARS", "400"))
-LBank_1D_BARS = int(os.getenv("LBANK_1D_BARS", "800"))
+BINANCE_TIMEOUT = int(os.getenv("BINANCE_TIMEOUT", "15"))
+BINANCE_4H_BARS = int(os.getenv("BINANCE_4H_BARS", "400"))
+BINANCE_1D_BARS = int(os.getenv("BINANCE_1D_BARS", "800"))
+BINANCE_SCAN_WORKERS = int(os.getenv("BINANCE_SCAN_WORKERS", "16"))
 
 SENS = 0.28
 MIN_EVENT_SEPARATION = 5
@@ -929,20 +890,18 @@ def count_open_monthly_trades(
 
 
 # =========================================================
-# LBANK SYMBOL RESOLUTION
+# BINANCE SYMBOL RESOLUTION
 # =========================================================
 
 def normalize_requested_symbol(value):
     value = str(value or "").strip().upper()
     if not value:
         return ""
-
     value = value.replace("/", "_").replace("-", "_").replace(" ", "")
     if value.endswith("_USDT"):
         value = value[:-5]
     elif value.endswith("USDT"):
         value = value[:-4]
-
     return value
 
 
@@ -956,209 +915,44 @@ def read_source_symbols():
                 if not raw or raw.startswith("#"):
                     continue
                 rows.append(raw)
-
         if rows:
-            print(f"LBank source file: {path} ({len(rows)} requested symbols)")
+            print(f"Binance source file: {path} ({len(rows)} requested symbols)")
             return rows
 
-    print(
-        f"{path} was not found or empty; using embedded fallback list "
-        f"({len(FALLBACK_SOURCE_SYMBOLS)} symbols)."
-    )
+    print(f"{path} was not found or empty; using embedded fallback list ({len(FALLBACK_SOURCE_SYMBOLS)} symbols).")
     return list(FALLBACK_SOURCE_SYMBOLS)
 
 
-def lbank_json_get(base_url, path, params=None, futures=False):
-    """GET JSON from LBank with browser-like headers and small retries.
-
-    LBank documents the Futures public endpoints as unauthenticated public
-    interfaces. Some GitHub-hosted runners have nevertheless received HTTP
-    403 from the Futures hostname. The browser-like headers below make the
-    request look like a normal web request without using any proxy or
-    undocumented third-party service.
-    """
-    url = base_url.rstrip("/") + path
-
-    if futures:
-        headers = {
-            "Accept": "application/json, text/plain, */*",
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/140.0.0.0 Safari/537.36"
-            ),
-            "Referer": "https://www.lbank.com/",
-            "Origin": "https://www.lbank.com",
-            "Accept-Language": "en-US,en;q=0.9",
-            "Cache-Control": "no-cache",
-            "Pragma": "no-cache",
-        }
-    else:
-        headers = {
-            "Accept": "application/json",
-            "User-Agent": "CryptoTradeIQ/1.0",
-        }
-
+def binance_json_get(path, params=None):
+    url = BINANCE_SPOT_BASE.rstrip("/") + path
+    headers = {
+        "Accept": "application/json",
+        "User-Agent": "CryptoTradeIQ/1.0",
+    }
     last_error = None
-    attempts = 3 if futures else 1
-
-    for attempt in range(1, attempts + 1):
+    for attempt in range(3):
         try:
             response = requests.get(
                 url,
                 params=params or {},
                 headers=headers,
-                timeout=LBank_TIMEOUT,
+                timeout=BINANCE_TIMEOUT,
             )
-
-            if response.status_code == 403 and futures and attempt < attempts:
-                print(
-                    f"LBank Futures HTTP 403 on attempt {attempt}/{attempts}; "
-                    "retrying..."
-                )
-                continue
-
             response.raise_for_status()
-            return response.json()
+            payload = response.json()
+            if isinstance(payload, dict) and payload.get("code") not in (None, 0):
+                raise RuntimeError(str(payload))
+            return payload
         except Exception as error:
             last_error = error
-            if attempt < attempts:
-                print(
-                    f"LBank request failed on attempt {attempt}/{attempts}: "
-                    f"{error}; retrying..."
-                )
-                continue
-            raise
-
-    raise RuntimeError(f"LBank request failed: {last_error}")
+            if attempt < 2:
+                import time
+                time.sleep(0.7 * (attempt + 1))
+    raise RuntimeError(f"Binance request failed: {url} | {last_error}")
 
 
-def unwrap_lbank_data(payload):
-    if isinstance(payload, dict):
-        data = payload.get("data")
-        if isinstance(data, (list, dict)):
-            return data
-        # Some public endpoints return the array directly inside the body.
-        for key in ("result", "rows", "list"):
-            value = payload.get(key)
-            if isinstance(value, (list, dict)):
-                return value
-    return payload
-
-
-def get_lbank_futures_instruments():
-    """Return LBank SwapU Futures contract metadata.
-
-    This is the official public Futures endpoint documented by LBank:
-    /cfd/openApi/v1/pub/instrument?productGroup=SwapU
-    """
-    payload = lbank_json_get(
-        LBANK_FUTURES_BASE,
-        "/cfd/openApi/v1/pub/instrument",
-        {"productGroup": LBANK_PRODUCT_GROUP},
-        futures=True,
-    )
-
-    data = unwrap_lbank_data(payload)
-    if not isinstance(data, list) or not data:
-        raise RuntimeError(
-            "LBank Futures instrument response was empty or malformed: "
-            f"{payload}"
-        )
-
-    rows = []
-    for item in data:
-        if not isinstance(item, dict):
-            continue
-
-        symbol = str(item.get("symbol") or "").strip().upper()
-        if not symbol:
-            continue
-
-        rows.append(
-            {
-                "symbol": symbol,
-                "name": str(item.get("baseCurrency") or symbol.replace("USDT", "")),
-                "source_symbol": symbol,
-                "futures_symbol": symbol,
-                "base_currency": str(item.get("baseCurrency") or "").upper(),
-                "clear_currency": str(item.get("clearCurrency") or "USDT").upper(),
-                "price_tick": item.get("priceTick"),
-                "volume_tick": item.get("volumeTick"),
-                "min_order_volume": item.get("minOrderVolume"),
-                "min_order_cost": item.get("minOrderCost"),
-                "default_leverage": item.get("defaultLeverage"),
-            }
-        )
-
-    if not rows:
-        raise RuntimeError(
-            "LBank Futures instrument endpoint returned no usable contracts."
-        )
-
-    print(
-        f"LBank Futures {LBANK_PRODUCT_GROUP} instruments loaded: "
-        f"{len(rows)} contracts"
-    )
-    return rows
-
-def get_lbank_spot_pairs():
-    """Return LBank's public spot trading pairs.
-
-    This is the authoritative public list used to decide whether a requested
-    coin exists on LBank. We try both documented/current hosts.
-    """
-    last_error = None
-    for base in (LBANK_SPOT_BASE, LBANK_SPOT_FALLBACK_BASE):
-        try:
-            payload = lbank_json_get(base, "/v2/currencyPairs.do")
-            data = unwrap_lbank_data(payload)
-
-            if isinstance(data, list):
-                pairs = []
-                for item in data:
-                    if isinstance(item, str):
-                        pairs.append(item)
-                    elif isinstance(item, dict):
-                        pair = (
-                            item.get("symbol")
-                            or item.get("pair")
-                            or item.get("currencyPair")
-                        )
-                        if pair:
-                            pairs.append(str(pair))
-                if pairs:
-                    print(f"LBank spot pair list loaded from {base}: {len(pairs)} pairs")
-                    return base, pairs
-
-            last_error = RuntimeError(
-                f"Unexpected LBank spot pair response from {base}: {payload}"
-            )
-        except Exception as error:
-            last_error = error
-            print(f"LBank spot pair request failed on {base}: {error}")
-
-    raise RuntimeError(
-        "Could not retrieve LBank public trading-pair list from either API host. "
-        f"Last error: {last_error}"
-    )
-
-
-def normalize_lbank_pair(value):
-    value = str(value or "").strip().lower()
-    value = value.replace("/", "_").replace("-", "_").replace(" ", "")
-    if value.endswith("usdt") and "_usdt" not in value:
-        value = value[:-4] + "_usdt"
-    return value
-
-
-def get_lbank_crypto_symbols():
-    """Resolve the requested coins strictly against LBank Futures SwapU.
-
-    IMPORTANT: There is deliberately NO Spot fallback here. If LBank Futures
-    cannot be reached from GitHub Actions, the workflow fails instead of
-    silently scanning Spot data.
-    """
+def get_binance_futures_symbols():
+    """Resolve requested coins against Binance USDⓈ-M perpetual futures."""
     requested = read_source_symbols()
     requested_bases = []
     seen = set()
@@ -1169,178 +963,110 @@ def get_lbank_crypto_symbols():
             seen.add(base)
             requested_bases.append(base)
 
-    futures_rows = get_lbank_futures_instruments()
+    payload = binance_json_get("/api/v3/exchangeInfo")
+    symbols = payload.get("symbols", []) if isinstance(payload, dict) else []
 
-    futures_map = {}
-    for row in futures_rows:
-        base = normalize_requested_symbol(
-            row.get("base_currency") or row.get("symbol")
-        )
-        if base:
-            futures_map.setdefault(base, row)
+    symbol_map = {}
+    for item in symbols:
+        if not isinstance(item, dict):
+            continue
+        if item.get("status") != "TRADING":
+            continue
+        if item.get("quoteAsset") != "USDT":
+            continue
+        if item.get("contractType") != "PERPETUAL":
+            continue
+        symbol = str(item.get("symbol") or "").upper()
+        base = str(item.get("baseAsset") or "").upper()
+        if symbol and base:
+            symbol_map.setdefault(base, item)
 
     rows = []
     missing = []
-
     for base in requested_bases:
-        row = futures_map.get(base)
-        if not row:
+        item = symbol_map.get(base)
+        if not item:
             missing.append(base)
             continue
-
-        rows.append(
-            {
-                "symbol": row["symbol"],
-                "name": base,
-                "source_symbol": base + "USDT",
-                "futures_symbol": row["futures_symbol"],
-                "base_currency": row["base_currency"],
-                "clear_currency": row["clear_currency"],
-                "price_tick": row.get("price_tick"),
-                "volume_tick": row.get("volume_tick"),
-                "min_order_volume": row.get("min_order_volume"),
-                "min_order_cost": row.get("min_order_cost"),
-                "default_leverage": row.get("default_leverage"),
-            }
-        )
+        rows.append({
+            "symbol": item["symbol"],
+            "name": base,
+            "source_symbol": base + "USDT",
+            "futures_symbol": item["symbol"],
+            "base_currency": base,
+            "clear_currency": "USDT",
+            "price_tick": next((x.get("tickSize") for x in item.get("filters", []) if x.get("filterType") == "PRICE_FILTER"), None),
+            "volume_tick": next((x.get("stepSize") for x in item.get("filters", []) if x.get("filterType") == "LOT_SIZE"), None),
+            "min_order_volume": next((x.get("minQty") for x in item.get("filters", []) if x.get("filterType") == "LOT_SIZE"), None),
+            "min_order_cost": None,
+            "default_leverage": None,
+        })
 
     order = {base: i for i, base in enumerate(requested_bases)}
-    rows.sort(
-        key=lambda row: order.get(
-            normalize_requested_symbol(row["source_symbol"]), 999999
-        )
-    )
+    rows.sort(key=lambda row: order.get(normalize_requested_symbol(row["source_symbol"]), 999999))
 
-    print(f"LBank requested symbols : {len(requested_bases)}")
-    print(f"LBank Futures matched   : {len(rows)}")
-    print(f"LBank Futures missing   : {len(missing)}")
-
+    print(f"Binance requested symbols : {len(requested_bases)}")
+    print(f"Binance Spot matched   : {len(rows)}")
+    print(f"Binance Spot missing   : {len(missing)}")
     if missing:
-        print("Not listed on LBank Futures: " + ", ".join(missing))
-
-    if rows:
-        print(
-            "Final LBank Futures symbols: "
-            + ", ".join(row["symbol"] for row in rows)
-        )
+        print("Not listed on Binance Spot: " + ", ".join(missing))
 
     if not rows:
-        raise RuntimeError(
-            "None of the requested coins are currently available on LBank Futures "
-            f"{LBANK_PRODUCT_GROUP}."
-        )
-
+        raise RuntimeError("None of the requested coins are currently available on Binance USDⓈ-M Futures.")
     return rows
 
 
 # =========================================================
-# LBANK KLINE DATA
+# BINANCE KLINE DATA
 # =========================================================
 
-def _lbank_kline(symbol, size, interval_type):
-    # Official LBank spot Kline format:
-    # [timestamp, open, high, low, close, volume]
-    # `time` is required by the documented endpoint.
-    last_error = None
+def _binance_kline(symbol, size, interval):
+    requested_size = min(int(size), 1500)
+    try:
+        payload = binance_json_get(
+            "/api/v3/klines",
+            {
+                "symbol": symbol,
+                "interval": interval,
+                "limit": requested_size,
+            },
+        )
+        if not isinstance(payload, list) or not payload:
+            raise RuntimeError(f"Empty Kline response for {symbol} {interval}")
 
-    for base in (LBANK_SPOT_BASE, LBANK_SPOT_FALLBACK_BASE):
-        try:
-            requested_size = min(int(size), 2000)
+        rows = []
+        for item in payload:
+            if not isinstance(item, (list, tuple)) or len(item) < 6:
+                continue
+            try:
+                rows.append({
+                    "Time": pd.to_datetime(int(item[0]), unit="ms", utc=True),
+                    "Open": float(item[1]),
+                    "High": float(item[2]),
+                    "Low": float(item[3]),
+                    "Close": float(item[4]),
+                })
+            except (TypeError, ValueError):
+                continue
 
-            # LBank's REST Kline `time` parameter is the timestamp from which
-            # bars are returned forward. Using "now" asks for bars after the
-            # current moment and can therefore return an empty list.
-            interval_seconds = {
-                "minute1": 60,
-                "minute5": 5 * 60,
-                "minute15": 15 * 60,
-                "minute30": 30 * 60,
-                "hour1": 60 * 60,
-                "hour4": 4 * 60 * 60,
-                "hour8": 8 * 60 * 60,
-                "hour12": 12 * 60 * 60,
-                "day1": 24 * 60 * 60,
-                "week1": 7 * 24 * 60 * 60,
-                "month1": 30 * 24 * 60 * 60,
-            }.get(interval_type, 4 * 60 * 60)
+        if not rows:
+            raise RuntimeError(f"No usable Kline rows for {symbol} {interval}")
 
-            start_time = int(
-                datetime.now(timezone.utc).timestamp()
-            ) - (requested_size + 10) * interval_seconds
+        df = (
+            pd.DataFrame(rows)
+            .drop_duplicates(subset=["Time"])
+            .sort_values("Time")
+            .set_index("Time")
+        )
+        df = df[["Open", "High", "Low", "Close"]].dropna().copy()
 
-            payload = lbank_json_get(
-                base,
-                "/v2/kline.do",
-                {
-                    "symbol": symbol,
-                    "size": requested_size,
-                    "type": interval_type,
-                    "time": start_time,
-                },
-            )
-
-            data = payload.get("data") if isinstance(payload, dict) else None
-            if not isinstance(data, list):
-                raise RuntimeError(
-                    f"Invalid Kline response for {symbol}: {payload}"
-                )
-
-            if not data:
-                raise RuntimeError(
-                    f"Empty Kline response for {symbol} {interval_type}; "
-                    f"requested {requested_size} bars from {start_time}"
-                )
-
-            rows = []
-            for item in data:
-                if not isinstance(item, (list, tuple)) or len(item) < 5:
-                    continue
-                try:
-                    ts = float(item[0])
-                    # LBank documents seconds, but tolerate milliseconds.
-                    if ts > 10_000_000_000:
-                        ts /= 1000.0
-
-                    rows.append(
-                        {
-                            "Time": pd.to_datetime(ts, unit="s", utc=True),
-                            "Open": float(item[1]),
-                            "High": float(item[2]),
-                            "Low": float(item[3]),
-                            "Close": float(item[4]),
-                        }
-                    )
-                except (TypeError, ValueError):
-                    continue
-
-            if not rows:
-                raise RuntimeError(f"No usable Kline rows for {symbol}")
-
-            df = (
-                pd.DataFrame(rows)
-                .drop_duplicates(subset=["Time"])
-                .sort_values("Time")
-                .set_index("Time")
-            )
-
-            needed = ["Open", "High", "Low", "Close"]
-            df = df[needed].dropna().copy()
-
-            # The latest 4H/day candle can still be in progress. The strategy
-            # must only work on fully completed candles.
-            if len(df) > 1:
-                df = df.iloc[:-1].copy()
-
-            return df
-
-        except Exception as error:
-            last_error = error
-            print(
-                f"LBank Kline request failed: "
-                f"{symbol} {interval_type} via {base}: {error}"
-            )
-
-    return None
+        # Ignore the currently forming candle.
+        if len(df) > 1:
+            df = df.iloc[:-1].copy()
+        return df
+    except Exception as error:
+        print(f"Binance Kline request failed: {symbol} {interval}: {error}")
+        return None
 
 
 _RUN_DATA_CACHE = {}
@@ -1357,25 +1083,19 @@ def _cached_download(key, loader):
 
 
 def download_4h(symbol):
-    key = ("4h", normalize_lbank_pair(symbol))
-    return _cached_download(key, lambda: _lbank_kline(key[1], LBank_4H_BARS, "hour4"))
+    return _cached_download(("4h", symbol), lambda: _binance_kline(symbol, BINANCE_4H_BARS, "4h"))
 
 
 def download_1d(symbol):
-    key = ("1d", normalize_lbank_pair(symbol))
-    return _cached_download(key, lambda: _lbank_kline(key[1], LBank_1D_BARS, "day1"))
+    return _cached_download(("1d", symbol), lambda: _binance_kline(symbol, BINANCE_1D_BARS, "1d"))
 
 
 def latest_daily_order(df):
-
     if df is None or len(df) < 30:
         return None
-
     signals = latest_signals(df)
-
     if not signals:
         return None
-
     return signals[-1]
 
 
@@ -1880,9 +1600,6 @@ def allocate_trade(state):
     notional = margin * LEVERAGE
 
     # Never exceed the configured maximum number of simulated open positions.
-    if len(state.get("active", {})) >= MAX_OPEN_POSITIONS:
-        raise RuntimeError(f"Maximum open positions reached ({MAX_OPEN_POSITIONS}).")
-
     # Always recover a valid unique number, even if an old state file was
     # manually edited or contains a missing/invalid next_trade_number.
     used = []
@@ -2781,14 +2498,14 @@ def main():
     record_equity_point(state, "heartbeat")
     # Telegram commands are handled by the separate command workflow.
 
-    lbank_symbols = get_lbank_crypto_symbols()
+    binance_symbols = get_binance_futures_symbols()
 
-    workers = max(1, min(int(os.getenv("LBANK_SCAN_WORKERS", "10")), 20))
-    print(f"LBank parallel scan workers: {workers}")
+    workers = max(1, min(BINANCE_SCAN_WORKERS, 32))
+    print(f"Binance parallel scan workers: {workers}")
 
     results = {}
     with ThreadPoolExecutor(max_workers=workers) as executor:
-        future_map = {executor.submit(download_4h, info["symbol"]): info for info in lbank_symbols}
+        future_map = {executor.submit(download_4h, info["symbol"]): info for info in binance_symbols}
         for future in as_completed(future_map):
             info = future_map[future]
             symbol = info["symbol"]
@@ -2798,7 +2515,7 @@ def main():
                 results[symbol] = None
                 print(f"{symbol}: ERROR: {error}")
 
-    for info in lbank_symbols:
+    for info in binance_symbols:
         symbol = info["symbol"]
         df = results.get(symbol)
         if df is None or len(df) < 30:
