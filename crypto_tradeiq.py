@@ -27,6 +27,13 @@ BINANCE_SPOT_BASE = os.getenv(
     "https://data-api.binance.vision",
 ).rstrip("/")
 
+# Public USDⓈ-M Futures market-data API. No API key is required for the
+# exchangeInfo/klines endpoints used here.
+BINANCE_FUTURES_BASE = os.getenv(
+    "BINANCE_FUTURES_BASE",
+    "https://fapi.binance.com",
+).rstrip("/")
+
 BINANCE_TIMEOUT = int(os.getenv("BINANCE_TIMEOUT", "15"))
 BINANCE_4H_BARS = int(os.getenv("BINANCE_4H_BARS", "400"))
 BINANCE_1D_BARS = int(os.getenv("BINANCE_1D_BARS", "800"))
@@ -950,6 +957,89 @@ def binance_json_get(path, params=None):
     raise RuntimeError(f"Binance request failed: {url} | {last_error}")
 
 
+def binance_futures_json_get(path, params=None):
+    url = BINANCE_FUTURES_BASE.rstrip("/") + path
+    headers = {
+        "Accept": "application/json",
+        "User-Agent": "CryptoTradeIQ/1.0",
+    }
+    last_error = None
+    for attempt in range(3):
+        try:
+            response = requests.get(
+                url,
+                params=params or {},
+                headers=headers,
+                timeout=BINANCE_TIMEOUT,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            if isinstance(payload, dict) and payload.get("code") not in (None, 0):
+                raise RuntimeError(str(payload))
+            return payload
+        except Exception as error:
+            last_error = error
+            if attempt < 2:
+                import time
+                time.sleep(0.7 * (attempt + 1))
+    raise RuntimeError(f"Binance Futures request failed: {url} | {last_error}")
+
+
+def get_binance_futures_symbols(missing_bases):
+    """Resolve only Spot-missing requested coins against Binance USDⓈ-M Futures.
+
+    Only active USDT-margined perpetual contracts are accepted. This keeps the
+    scanner focused on crypto perpetual futures and avoids stock/TradFi
+    contracts that may appear in a broad futures symbol list.
+    """
+    if not missing_bases:
+        return []
+
+    payload = binance_futures_json_get("/fapi/v1/exchangeInfo")
+    symbols = payload.get("symbols", []) if isinstance(payload, dict) else []
+    wanted = {str(x).upper() for x in missing_bases}
+    rows = []
+    seen = set()
+
+    for item in symbols:
+        if not isinstance(item, dict):
+            continue
+        if item.get("status") != "TRADING":
+            continue
+        if item.get("quoteAsset") != "USDT":
+            continue
+        if item.get("marginAsset") != "USDT":
+            continue
+        if item.get("contractType") != "PERPETUAL":
+            continue
+
+        base = str(item.get("baseAsset") or "").upper()
+        symbol = str(item.get("symbol") or "").upper()
+        if not base or not symbol or base not in wanted or base in seen:
+            continue
+
+        seen.add(base)
+        rows.append({
+            "symbol": symbol,
+            "name": base,
+            "source_symbol": base + "USDT",
+            "spot_symbol": None,
+            "futures_symbol": symbol,
+            "market_source": "FUTURES",
+            "base_currency": base,
+            "clear_currency": "USDT",
+            "price_tick": next((x.get("tickSize") for x in item.get("filters", []) if x.get("filterType") == "PRICE_FILTER"), None),
+            "volume_tick": next((x.get("stepSize") for x in item.get("filters", []) if x.get("filterType") == "LOT_SIZE"), None),
+            "min_order_volume": next((x.get("minQty") for x in item.get("filters", []) if x.get("filterType") == "LOT_SIZE"), None),
+            "min_order_cost": next((x.get("notional") for x in item.get("filters", []) if x.get("filterType") == "MIN_NOTIONAL"), None),
+            "default_leverage": None,
+        })
+
+    order = {base: i for i, base in enumerate(missing_bases)}
+    rows.sort(key=lambda row: order.get(row["name"], 999999))
+    return rows
+
+
 def get_binance_spot_symbols():
     """Resolve requested coins against Binance Spot USDT markets."""
     requested = read_source_symbols()
@@ -990,6 +1080,8 @@ def get_binance_spot_symbols():
             "name": base,
             "source_symbol": base + "USDT",
             "spot_symbol": item["symbol"],
+            "futures_symbol": None,
+            "market_source": "SPOT",
             "base_currency": base,
             "clear_currency": "USDT",
             "price_tick": next((x.get("tickSize") for x in item.get("filters", []) if x.get("filterType") == "PRICE_FILTER"), None),
@@ -1003,31 +1095,59 @@ def get_binance_spot_symbols():
     rows.sort(key=lambda row: order.get(normalize_requested_symbol(row["source_symbol"]), 999999))
 
     print(f"Binance requested symbols : {len(requested_bases)}")
-    print(f"Binance Spot matched   : {len(rows)}")
-    print(f"Binance Spot missing   : {len(missing)}")
-    if missing:
-        print("Not listed on Binance Spot: " + ", ".join(missing))
+    print(f"Binance Spot matched      : {len(rows)}")
+    print(f"Binance Spot missing      : {len(missing)}")
 
-    if not rows:
-        raise RuntimeError("None of the requested coins are currently available on Binance Spot.")
-    return rows
+    # Anything missing from Spot is checked on USDⓈ-M Futures.
+    futures_rows = []
+    if missing:
+        try:
+            futures_rows = get_binance_futures_symbols(missing)
+        except Exception as error:
+            print(f"Binance Futures symbol lookup failed: {error}")
+
+    futures_bases = {row["name"] for row in futures_rows}
+    still_missing = [base for base in missing if base not in futures_bases]
+
+    print(f"Binance Futures matched   : {len(futures_rows)}")
+    print(f"Binance unavailable both  : {len(still_missing)}")
+    if still_missing:
+        print("Not listed on Binance Spot or USDⓈ-M Futures: " + ", ".join(still_missing))
+
+    combined = rows + futures_rows
+    combined.sort(key=lambda row: order.get(normalize_requested_symbol(row["source_symbol"]), 999999))
+
+    if not combined:
+        raise RuntimeError("None of the requested coins are available on Binance Spot or USDⓈ-M Futures.")
+    return combined
 
 
 # =========================================================
 # BINANCE KLINE DATA
 # =========================================================
 
-def _binance_kline(symbol, size, interval):
+def _binance_kline(symbol, size, interval, market_source="SPOT"):
     requested_size = min(int(size), 1500)
     try:
-        payload = binance_json_get(
-            "/api/v3/klines",
-            {
-                "symbol": symbol,
-                "interval": interval,
-                "limit": requested_size,
-            },
-        )
+        if str(market_source).upper() == "FUTURES":
+            payload = binance_futures_json_get(
+                "/fapi/v1/klines",
+                {
+                    "symbol": symbol,
+                    "interval": interval,
+                    "limit": requested_size,
+                },
+            )
+        else:
+            payload = binance_json_get(
+                "/api/v3/klines",
+                {
+                    "symbol": symbol,
+                    "interval": interval,
+                    "limit": requested_size,
+                },
+            )
+
         if not isinstance(payload, list) or not payload:
             raise RuntimeError(f"Empty Kline response for {symbol} {interval}")
 
@@ -1062,7 +1182,7 @@ def _binance_kline(symbol, size, interval):
             df = df.iloc[:-1].copy()
         return df
     except Exception as error:
-        print(f"Binance Kline request failed: {symbol} {interval}: {error}")
+        print(f"Binance {market_source} Kline request failed: {symbol} {interval}: {error}")
         return None
 
 
@@ -1079,12 +1199,14 @@ def _cached_download(key, loader):
     return value
 
 
-def download_4h(symbol):
-    return _cached_download(("4h", symbol), lambda: _binance_kline(symbol, BINANCE_4H_BARS, "4h"))
+def download_4h(symbol, market_source="SPOT"):
+    source = str(market_source or "SPOT").upper()
+    return _cached_download(("4h", source, symbol), lambda: _binance_kline(symbol, BINANCE_4H_BARS, "4h", source))
 
 
-def download_1d(symbol):
-    return _cached_download(("1d", symbol), lambda: _binance_kline(symbol, BINANCE_1D_BARS, "1d"))
+def download_1d(symbol, market_source="SPOT"):
+    source = str(market_source or "SPOT").upper()
+    return _cached_download(("1d", source, symbol), lambda: _binance_kline(symbol, BINANCE_1D_BARS, "1d", source))
 
 
 def latest_daily_order(df):
@@ -2384,7 +2506,7 @@ def analyze_symbol(state, info, df):
         save_state(state)
         return
 
-    daily_df = download_1d(info["symbol"])
+    daily_df = download_1d(info["symbol"], info.get("market_source", "SPOT"))
     daily_signal = latest_daily_order(daily_df)
     if not daily_order_matches(signal, daily_signal):
         print(f"{info['symbol']}: {signal['side']} 4H signal disabled because Daily order is missing/opposite.")
@@ -2502,7 +2624,7 @@ def main():
 
     results = {}
     with ThreadPoolExecutor(max_workers=workers) as executor:
-        future_map = {executor.submit(download_4h, info["symbol"]): info for info in binance_symbols}
+        future_map = {executor.submit(download_4h, info["symbol"], info.get("market_source", "SPOT")): info for info in binance_symbols}
         for future in as_completed(future_map):
             info = future_map[future]
             symbol = info["symbol"]
@@ -2518,7 +2640,7 @@ def main():
         if df is None or len(df) < 30:
             print(f"{symbol}: insufficient data")
             continue
-        print(f"{symbol} rows={len(df)}")
+        print(f"{symbol} [{info.get('market_source', 'SPOT')}] rows={len(df)}")
         try:
             analyze_symbol(state, info, df)
         except Exception as error:
