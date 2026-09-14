@@ -24,7 +24,7 @@ FALLBACK_SOURCE_SYMBOLS = [
 
 BINANCE_SPOT_BASE = os.getenv(
     "BINANCE_SPOT_BASE",
-    "https://api.binance.com",
+    "https://data-api.binance.vision",
 ).rstrip("/")
 
 BINANCE_TIMEOUT = int(os.getenv("BINANCE_TIMEOUT", "15"))
