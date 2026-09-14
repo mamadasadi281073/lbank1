@@ -28,10 +28,10 @@ BINANCE_SPOT_BASE = os.getenv(
 ).rstrip("/")
 
 # Public Futures market-data source for symbols that are not available on
-# Binance Spot. Bybit V5 public market-data endpoints require no API key.
-BYBIT_FUTURES_BASE = os.getenv(
-    "BYBIT_FUTURES_BASE",
-    "https://api.bybit.com",
+# Binance Spot. OKX public market-data endpoints require no API key.
+OKX_FUTURES_BASE = os.getenv(
+    "OKX_FUTURES_BASE",
+    "https://www.okx.com",
 ).rstrip("/")
 
 BINANCE_TIMEOUT = int(os.getenv("BINANCE_TIMEOUT", "15"))
@@ -957,8 +957,8 @@ def binance_json_get(path, params=None):
     raise RuntimeError(f"Binance request failed: {url} | {last_error}")
 
 
-def bybit_futures_json_get(path, params=None):
-    url = BYBIT_FUTURES_BASE.rstrip("/") + path
+def okx_json_get(path, params=None):
+    url = OKX_FUTURES_BASE.rstrip("/") + path
     headers = {
         "Accept": "application/json",
         "User-Agent": "CryptoTradeIQ/1.0",
@@ -975,8 +975,8 @@ def bybit_futures_json_get(path, params=None):
             response.raise_for_status()
             payload = response.json()
             if not isinstance(payload, dict):
-                raise RuntimeError(f"Unexpected Bybit response: {payload!r}")
-            if payload.get("retCode") not in (None, 0):
+                raise RuntimeError(f"Unexpected OKX response: {payload!r}")
+            if str(payload.get("code", "0")) != "0":
                 raise RuntimeError(str(payload))
             return payload
         except Exception as error:
@@ -984,85 +984,60 @@ def bybit_futures_json_get(path, params=None):
             if attempt < 2:
                 import time
                 time.sleep(0.7 * (attempt + 1))
-    raise RuntimeError(f"Bybit Futures request failed: {url} | {last_error}")
+    raise RuntimeError(f"OKX Futures request failed: {url} | {last_error}")
 
 
-def get_bybit_futures_symbols(missing_bases):
-    """Resolve Spot-missing requested coins against Bybit USDT perpetual Futures."""
+def get_okx_futures_symbols(missing_bases):
+    """Resolve Spot-missing requested coins against OKX USDT linear perpetual SWAPs."""
     if not missing_bases:
         return []
 
     wanted = {str(x).upper() for x in missing_bases}
     rows = []
     seen = set()
-    cursor = None
+    payload = okx_json_get(
+        "/api/v5/public/instruments",
+        {"instType": "SWAP"},
+    )
+    instruments = payload.get("data") or []
 
-    # Bybit has more than 500 linear instruments, so paginate until all
-    # requested bases are found or the API has no next page.
-    for _ in range(10):
-        params = {
-            "category": "linear",
-            "status": "Trading",
-            "limit": 1000,
-        }
-        if cursor:
-            params["cursor"] = cursor
+    for item in instruments:
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("instType") or "").upper() != "SWAP":
+            continue
+        if str(item.get("state") or "").lower() != "live":
+            continue
+        inst_id = str(item.get("instId") or "").upper()
+        if not inst_id.endswith("-USDT-SWAP"):
+            continue
+        base = str(item.get("baseCcy") or "").upper()
+        if not base:
+            parts = inst_id.split("-")
+            base = parts[0] if parts else ""
+        if not base or base not in wanted or base in seen:
+            continue
 
-        payload = bybit_futures_json_get(
-            "/v5/market/instruments-info",
-            params,
-        )
-        result = payload.get("result") or {}
-        symbols = result.get("list") or []
-
-        for item in symbols:
-            if not isinstance(item, dict):
-                continue
-            if item.get("status") != "Trading":
-                continue
-            if item.get("contractType") != "LinearPerpetual":
-                continue
-            if str(item.get("quoteCoin") or "").upper() != "USDT":
-                continue
-            if str(item.get("settleCoin") or "").upper() != "USDT":
-                continue
-
-            base = str(item.get("baseCoin") or "").upper()
-            symbol = str(item.get("symbol") or "").upper()
-            if not base or not symbol or base not in wanted or base in seen:
-                continue
-
-            seen.add(base)
-            price_filter = item.get("priceFilter") or {}
-            lot_filter = item.get("lotSizeFilter") or {}
-            rows.append({
-                "symbol": symbol,
-                "name": base,
-                "source_symbol": base + "USDT",
-                "spot_symbol": None,
-                "futures_symbol": symbol,
-                "market_source": "BYBIT_FUTURES",
-                "base_currency": base,
-                "clear_currency": "USDT",
-                "price_tick": price_filter.get("tickSize"),
-                "volume_tick": lot_filter.get("qtyStep"),
-                "min_order_volume": lot_filter.get("minOrderQty"),
-                "min_order_cost": lot_filter.get("minNotionalValue"),
-                "default_leverage": (item.get("leverageFilter") or {}).get("maxLeverage"),
-            })
-
-        if wanted.issubset(seen):
-            break
-
-        next_cursor = str(result.get("nextPageCursor") or "")
-        if not next_cursor or next_cursor == cursor:
-            break
-        cursor = next_cursor
+        seen.add(base)
+        rows.append({
+            "symbol": inst_id,
+            "name": base,
+            "source_symbol": base + "USDT",
+            "spot_symbol": None,
+            "futures_symbol": inst_id,
+            "market_source": "OKX_FUTURES",
+            "base_currency": base,
+            "clear_currency": "USDT",
+            "price_tick": item.get("tickSz"),
+            "volume_tick": item.get("lotSz"),
+            "min_order_volume": item.get("minSz"),
+            "min_order_cost": None,
+            "default_leverage": None,
+        })
 
     order = {base: i for i, base in enumerate(missing_bases)}
     rows.sort(key=lambda row: order.get(row["name"], 999999))
     return rows
-
 
 def get_binance_spot_symbols():
     """Resolve requested coins against Binance Spot USDT markets."""
@@ -1126,23 +1101,23 @@ def get_binance_spot_symbols():
     futures_rows = []
     if missing:
         try:
-            futures_rows = get_bybit_futures_symbols(missing)
+            futures_rows = get_okx_futures_symbols(missing)
         except Exception as error:
-            print(f"Bybit Futures symbol lookup failed: {error}")
+            print(f"OKX Futures symbol lookup failed: {error}")
 
     futures_bases = {row["name"] for row in futures_rows}
     still_missing = [base for base in missing if base not in futures_bases]
 
-    print(f"Bybit Futures matched   : {len(futures_rows)}")
-    print(f"Unavailable on Binance Spot and Bybit Futures  : {len(still_missing)}")
+    print(f"OKX Futures matched      : {len(futures_rows)}")
+    print(f"Unavailable on Binance Spot and OKX Futures    : {len(still_missing)}")
     if still_missing:
-        print("Not listed on Binance Spot or Bybit USDT Perpetual Futures: " + ", ".join(still_missing))
+        print("Not listed on Binance Spot or OKX USDT Perpetual SWAP: " + ", ".join(still_missing))
 
     combined = rows + futures_rows
     combined.sort(key=lambda row: order.get(normalize_requested_symbol(row["source_symbol"]), 999999))
 
     if not combined:
-        raise RuntimeError("None of the requested coins are available on Binance Spot or Bybit USDT Perpetual Futures.")
+        raise RuntimeError("None of the requested coins are available on Binance Spot or OKX USDT Perpetual SWAP.")
     return combined
 
 
@@ -1150,24 +1125,23 @@ def get_binance_spot_symbols():
 # BINANCE KLINE DATA
 # =========================================================
 
-def _binance_kline(symbol, size, interval, market_source="SPOT"):
-    requested_size = min(int(size), 1000 if str(market_source).upper() == "BYBIT_FUTURES" else 1500)
+def _binance_kline(symbol, size, interval, market_source="SPOT", keep_forming=False):
     source = str(market_source or "SPOT").upper()
+    requested_size = min(int(size), 1440 if source == "OKX_FUTURES" else (1500 if source == "SPOT" else 1000))
     try:
-        if source == "BYBIT_FUTURES":
-            # Bybit V5: interval 240 = 4H, D = 1D.
-            bybit_interval = "240" if interval == "4h" else ("D" if interval == "1d" else str(interval))
-            payload = bybit_futures_json_get(
-                "/v5/market/kline",
+        if source == "OKX_FUTURES":
+            # OKX public market data: no API key is required.
+            # 4H is the requested 4-hour bar; 1D is the daily bar.
+            okx_bar = "4H" if interval == "4h" else ("1D" if interval == "1d" else str(interval))
+            payload = okx_json_get(
+                "/api/v5/market/candles",
                 {
-                    "category": "linear",
-                    "symbol": symbol,
-                    "interval": bybit_interval,
+                    "instId": symbol,
+                    "bar": okx_bar,
                     "limit": requested_size,
                 },
             )
-            result = payload.get("result") or {}
-            payload_rows = result.get("list") or []
+            payload_rows = payload.get("data") or []
         else:
             payload_rows = binance_json_get(
                 "/api/v3/klines",
@@ -1186,12 +1160,15 @@ def _binance_kline(symbol, size, interval, market_source="SPOT"):
             if not isinstance(item, (list, tuple)) or len(item) < 6:
                 continue
             try:
+                # OKX: [ts,o,h,l,c,vol,volCcy,volCcyQuote,confirm]
+                # Binance: [openTime,o,h,l,c,vol,...]
                 rows.append({
                     "Time": pd.to_datetime(int(item[0]), unit="ms", utc=True),
                     "Open": float(item[1]),
                     "High": float(item[2]),
                     "Low": float(item[3]),
                     "Close": float(item[4]),
+                    "_confirm": str(item[8]) if source == "OKX_FUTURES" and len(item) > 8 else "1",
                 })
             except (TypeError, ValueError):
                 continue
@@ -1205,11 +1182,18 @@ def _binance_kline(symbol, size, interval, market_source="SPOT"):
             .sort_values("Time")
             .set_index("Time")
         )
-        df = df[["Open", "High", "Low", "Close"]].dropna().copy()
+        df = df[["Open", "High", "Low", "Close", "_confirm"]].dropna().copy()
 
-        # Ignore the currently forming candle.
-        if len(df) > 1:
+        if source == "OKX_FUTURES":
+            # OKX explicitly marks the live candle with confirm=0.
+            # For scanner data we use completed candles only.
+            if not keep_forming and len(df) > 1:
+                df = df[df["_confirm"] == "1"].copy()
+        elif not keep_forming and len(df) > 1:
+            # Binance Spot endpoint returns the currently forming candle too.
             df = df.iloc[:-1].copy()
+
+        df = df.drop(columns=["_confirm"])
         return df
     except Exception as error:
         print(f"{source} Kline request failed: {symbol} {interval}: {error}")
@@ -1231,12 +1215,19 @@ def _cached_download(key, loader):
 
 def download_4h(symbol, market_source="SPOT"):
     source = str(market_source or "SPOT").upper()
-    return _cached_download(("4h", source, symbol), lambda: _binance_kline(symbol, BINANCE_4H_BARS, "4h", source))
+    return _cached_download(("4h", source, symbol), lambda: _binance_kline(symbol, BINANCE_4H_BARS, "4h", source, keep_forming=False))
+
+
+def download_4h_monitor(symbol, market_source="SPOT"):
+    # Live/current 4H candle is intentionally retained for TP monitoring.
+    # This is separate from signal generation, which always uses completed bars.
+    source = str(market_source or "SPOT").upper()
+    return _binance_kline(symbol, max(50, min(BINANCE_4H_BARS, 300)), "4h", source, keep_forming=True)
 
 
 def download_1d(symbol, market_source="SPOT"):
     source = str(market_source or "SPOT").upper()
-    return _cached_download(("1d", source, symbol), lambda: _binance_kline(symbol, BINANCE_1D_BARS, "1d", source))
+    return _cached_download(("1d", source, symbol), lambda: _binance_kline(symbol, BINANCE_1D_BARS, "1d", source, keep_forming=False))
 
 
 def latest_daily_order(df):
@@ -1748,7 +1739,7 @@ def allocate_trade(state):
     margin = FIXED_MARGIN
     notional = margin * LEVERAGE
 
-    # Never exceed the configured maximum number of simulated open positions.
+    # No global maximum-open-position limit is applied.
     # Always recover a valid unique number, even if an old state file was
     # manually edited or contains a missing/invalid next_trade_number.
     used = []
@@ -2466,7 +2457,11 @@ def add_ob_distance(signal, df):
 # =========================================================
 
 def analyze_symbol(state, info, df):
-    check_take_profits(state, info, df)
+    # TP uses the live/current 4H candle from a live public API.
+    # SL remains based on a completed 4H candle close.
+    monitor_df = download_4h_monitor(info["symbol"], info.get("market_source", "SPOT"))
+    if monitor_df is not None and len(monitor_df) >= 2:
+        check_take_profits(state, info, monitor_df)
     check_stop(state, info, df)
 
     signals = latest_signals(df)
