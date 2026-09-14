@@ -10,7 +10,7 @@ import requests
 STATE_FILE = "kcex_signal_state.json"
 
 # =========================
-# BINANCE FUTURES SOURCE
+# BINANCE SPOT SOURCE
 # =========================
 # Public market-data only. No Binance account/API key is required.
 # GitHub Actions is used as the execution environment so the scanner does
@@ -22,9 +22,9 @@ FALLBACK_SOURCE_SYMBOLS = [
     "ADAUSDT", "DOGEUSDT", "AVAXUSDT", "LINKUSDT", "DOTUSDT",
 ]
 
-BINANCE_FUTURES_BASE = os.getenv(
-    "BINANCE_FUTURES_BASE",
-    "https://fapi.binance.com",
+BINANCE_SPOT_BASE = os.getenv(
+    "BINANCE_SPOT_BASE",
+    "https://api.binance.com",
 ).rstrip("/")
 
 BINANCE_TIMEOUT = int(os.getenv("BINANCE_TIMEOUT", "15"))
@@ -58,7 +58,6 @@ TP8_PERCENT = 20.0
 STARTING_BALANCE = 200.0
 FIXED_MARGIN = 10.0
 LEVERAGE = 10.0
-MAX_OPEN_POSITIONS = 5
 
 # Maximum allowed distance between the signal event close and the
 # selected Order Block boundary. Kept identical to the original filter.
@@ -951,8 +950,8 @@ def binance_json_get(path, params=None):
     raise RuntimeError(f"Binance request failed: {url} | {last_error}")
 
 
-def get_binance_futures_symbols():
-    """Resolve requested coins against Binance USDⓈ-M perpetual futures."""
+def get_binance_spot_symbols():
+    """Resolve requested coins against Binance Spot USDT markets."""
     requested = read_source_symbols()
     requested_bases = []
     seen = set()
@@ -974,8 +973,6 @@ def get_binance_futures_symbols():
             continue
         if item.get("quoteAsset") != "USDT":
             continue
-        if item.get("contractType") != "PERPETUAL":
-            continue
         symbol = str(item.get("symbol") or "").upper()
         base = str(item.get("baseAsset") or "").upper()
         if symbol and base:
@@ -992,7 +989,7 @@ def get_binance_futures_symbols():
             "symbol": item["symbol"],
             "name": base,
             "source_symbol": base + "USDT",
-            "futures_symbol": item["symbol"],
+            "spot_symbol": item["symbol"],
             "base_currency": base,
             "clear_currency": "USDT",
             "price_tick": next((x.get("tickSize") for x in item.get("filters", []) if x.get("filterType") == "PRICE_FILTER"), None),
@@ -1012,7 +1009,7 @@ def get_binance_futures_symbols():
         print("Not listed on Binance Spot: " + ", ".join(missing))
 
     if not rows:
-        raise RuntimeError("None of the requested coins are currently available on Binance USDⓈ-M Futures.")
+        raise RuntimeError("None of the requested coins are currently available on Binance Spot.")
     return rows
 
 
@@ -2498,7 +2495,7 @@ def main():
     record_equity_point(state, "heartbeat")
     # Telegram commands are handled by the separate command workflow.
 
-    binance_symbols = get_binance_futures_symbols()
+    binance_symbols = get_binance_spot_symbols()
 
     workers = max(1, min(BINANCE_SCAN_WORKERS, 32))
     print(f"Binance parallel scan workers: {workers}")
