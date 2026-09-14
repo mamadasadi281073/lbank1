@@ -11,7 +11,7 @@ permissions:
 # Keep command-state updates serialized with the crypto scanner because both
 # workflows write to the same repository state.
 concurrency:
-  group: lbank-crypto-scanner
+  group: tradeiq-crypto-state
   cancel-in-progress: false
 
 jobs:
