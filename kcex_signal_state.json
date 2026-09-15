@@ -546,7 +546,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-15T20:10:00+00:00"
+      "tp_last_scan_time": "2026-09-15T20:25:00+00:00"
     },
     "BARDUSDT": {
       "trade_number": 80,
@@ -643,7 +643,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-15T20:10:00+00:00"
+      "tp_last_scan_time": "2026-09-15T20:25:00+00:00"
     },
     "ALGOUSDT": {
       "trade_number": 81,
@@ -747,7 +747,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-15T20:10:00+00:00"
+      "tp_last_scan_time": "2026-09-15T20:25:00+00:00"
     },
     "IDUSDT": {
       "trade_number": 82,
@@ -844,7 +844,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-15T20:10:00+00:00"
+      "tp_last_scan_time": "2026-09-15T20:25:00+00:00"
     },
     "KMNOUSDT": {
       "trade_number": 83,
@@ -861,7 +861,7 @@
       "margin": 10.0,
       "notional": 100.0,
       "leverage": 10.0,
-      "tp1_hit": false,
+      "tp1_hit": true,
       "tp2_hit": false,
       "tp3_hit": false,
       "tp4_hit": false,
@@ -870,8 +870,16 @@
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "",
-      "tp_hits": [],
+      "last_tp_hit": "TP1",
+      "tp_hits": [
+        {
+          "name": "TP1",
+          "percent": 1.0,
+          "price": 0.024926800000000002,
+          "time": "2026-09-15T20:15:00+00:00",
+          "new_sl": 0.02468
+        }
+      ],
       "balance_at_entry": 100.0,
       "tp9_hit": false,
       "tp10_hit": false,
@@ -904,7 +912,8 @@
       "tp37_hit": false,
       "tp38_hit": false,
       "tp39_hit": false,
-      "tp40_hit": false
+      "tp40_hit": false,
+      "tp_last_scan_time": "2026-09-15T20:25:00+00:00"
     }
   },
   "closed_trades": [],
@@ -1257,6 +1266,10 @@
       "-1002536113120": false
     },
     "DAILY_REPORT|2026-09-15": {
+      "1448700069": true,
+      "-1002536113120": false
+    },
+    "TP|KMNOUSDT|BUY|2026-09-15T16:00:00+00:00|394|0.024680000000|TP1": {
       "1448700069": true,
       "-1002536113120": false
     }
@@ -1728,6 +1741,10 @@
     },
     "DAILY_REPORT|2026-09-15": {
       "text": "📊 گزارش روزانه\n\n📅 تاریخ: 2026-09-15\n\n💰 موجودی ابتدای روز: $100.00\n💰 موجودی فعلی: $100.00\n📈 سود/ضرر روز: +$0.00\n📊 بازده روز: 0.00%\n\n📨 سیگنال‌های امروز: 5\n✅ معاملات بسته‌شده سودده: 0\n❌ معاملات بسته‌شده زیان‌ده: 0\n🏆 بهترین معامله: $+0.00\n💥 بدترین معامله: $+0.00\n📈 بیشترین موجودی ثبت‌شده: $100.00\n📉 Max Drawdown: 0.00%\n📂 معاملات باز: 5\n\n@Cryptososhiant",
+      "reply_markup": null
+    },
+    "TP|KMNOUSDT|BUY|2026-09-15T16:00:00+00:00|394|0.024680000000|TP1": {
+      "text": "🎯 TP1 زده شد\n\n🔢 شماره معامله: #83\nنماد: KMNOUSDT\nجهت: BUY\nقیمت هدف: 0.0249268\nهدف: +1%\n🛡 SL جدید: 0.02468\n\n@Cryptososhiant",
       "reply_markup": null
     }
   }
