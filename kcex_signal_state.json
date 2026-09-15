@@ -539,7 +539,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-15T14:45:00+00:00"
+      "tp_last_scan_time": "2026-09-15T15:00:00+00:00"
     },
     "BARDUSDT": {
       "trade_number": 80,
@@ -548,8 +548,8 @@
       "signal_id": "SELL|2026-09-15T08:00:00+00:00|394|0.127900000000",
       "side": "SELL",
       "initial_sl": 0.1279,
-      "current_sl": 0.125342,
-      "sl": 0.125342,
+      "current_sl": 0.124063,
+      "sl": 0.124063,
       "entry_price": 0.1279,
       "signal_time": "2026-09-15T08:00:00+00:00",
       "activated_at": "2026-09-15T12:16:30.496398+00:00",
@@ -560,12 +560,12 @@
       "tp2_hit": true,
       "tp3_hit": true,
       "tp4_hit": true,
-      "tp5_hit": false,
+      "tp5_hit": true,
       "tp6_hit": false,
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "TP4",
+      "last_tp_hit": "TP5",
       "tp_hits": [
         {
           "name": "TP1",
@@ -594,6 +594,13 @@
           "price": 0.122784,
           "time": "2026-09-15T13:35:00+00:00",
           "new_sl": 0.125342
+        },
+        {
+          "name": "TP5",
+          "percent": 5.0,
+          "price": 0.121505,
+          "time": "2026-09-15T14:50:00+00:00",
+          "new_sl": 0.124063
         }
       ],
       "balance_at_entry": 100.0,
@@ -629,7 +636,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-15T14:45:00+00:00"
+      "tp_last_scan_time": "2026-09-15T15:00:00+00:00"
     },
     "ALGOUSDT": {
       "trade_number": 81,
@@ -638,8 +645,8 @@
       "signal_id": "SELL|2026-09-15T08:00:00+00:00|394|0.098300000000",
       "side": "SELL",
       "initial_sl": 0.0983,
-      "current_sl": 0.096334,
-      "sl": 0.096334,
+      "current_sl": 0.09535099999999999,
+      "sl": 0.09535099999999999,
       "entry_price": 0.0983,
       "signal_time": "2026-09-15T08:00:00+00:00",
       "activated_at": "2026-09-15T12:16:32.954163+00:00",
@@ -650,12 +657,12 @@
       "tp2_hit": true,
       "tp3_hit": true,
       "tp4_hit": true,
-      "tp5_hit": false,
+      "tp5_hit": true,
       "tp6_hit": false,
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "TP4",
+      "last_tp_hit": "TP5",
       "tp_hits": [
         {
           "name": "TP1",
@@ -684,6 +691,13 @@
           "price": 0.094368,
           "time": "2026-09-15T14:40:00+00:00",
           "new_sl": 0.096334
+        },
+        {
+          "name": "TP5",
+          "percent": 5.0,
+          "price": 0.093385,
+          "time": "2026-09-15T14:50:00+00:00",
+          "new_sl": 0.09535099999999999
         }
       ],
       "balance_at_entry": 100.0,
@@ -719,7 +733,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-15T14:45:00+00:00"
+      "tp_last_scan_time": "2026-09-15T15:00:00+00:00"
     }
   },
   "closed_trades": [],
@@ -1024,6 +1038,14 @@
       "-1002536113120": false
     },
     "TP|ALGOUSDT|SELL|2026-09-15T08:00:00+00:00|394|0.098300000000|TP4": {
+      "1448700069": true,
+      "-1002536113120": false
+    },
+    "TP|BARDUSDT|SELL|2026-09-15T08:00:00+00:00|394|0.127900000000|TP5": {
+      "1448700069": true,
+      "-1002536113120": false
+    },
+    "TP|ALGOUSDT|SELL|2026-09-15T08:00:00+00:00|394|0.098300000000|TP5": {
       "1448700069": true,
       "-1002536113120": false
     }
@@ -1423,6 +1445,14 @@
     },
     "TP|ALGOUSDT|SELL|2026-09-15T08:00:00+00:00|394|0.098300000000|TP4": {
       "text": "🎯 TP4 زده شد\n\n🔢 شماره معامله: #81\nنماد: ALGOUSDT\nجهت: SELL\nقیمت هدف: 0.094368\nهدف: +4%\n🛡 SL جدید: 0.096334\n\n@Cryptososhiant",
+      "reply_markup": null
+    },
+    "TP|BARDUSDT|SELL|2026-09-15T08:00:00+00:00|394|0.127900000000|TP5": {
+      "text": "🎯 TP5 زده شد\n\n🔢 شماره معامله: #80\nنماد: BARDUSDT\nجهت: SELL\nقیمت هدف: 0.121505\nهدف: +5%\n🛡 SL جدید: 0.124063\n\n@Cryptososhiant",
+      "reply_markup": null
+    },
+    "TP|ALGOUSDT|SELL|2026-09-15T08:00:00+00:00|394|0.098300000000|TP5": {
+      "text": "🎯 TP5 زده شد\n\n🔢 شماره معامله: #81\nنماد: ALGOUSDT\nجهت: SELL\nقیمت هدف: 0.093385\nهدف: +5%\n🛡 SL جدید: 0.095351\n\n@Cryptososhiant",
       "reply_markup": null
     }
   }
