@@ -1,6 +1,7 @@
 import os
 import re
 import json
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 
@@ -450,7 +451,7 @@ def get_monthly_stats(
 
 def get_week_start(dt):
     # هفته از دوشنبه شروع می‌شود.
-    monday = dt - pd.Timedelta(days=int(dt.weekday()))
+    monday = dt - pd.Timedelta(days=int(dt.weekday()), unit="D")
     return monday.strftime("%Y-%m-%d")
 
 
@@ -1876,12 +1877,32 @@ def calculate_tp_price(
 # =========================================================
 
 def download_tp_monitor(symbol):
-    """Fetch recent LIVE 5m Binance candles for TP detection."""
+    """Fetch recent LIVE 5m Binance candles for TP detection.
+
+    Binance Spot public klines are used; no API key is required.  We keep the
+    currently forming 5m candle because TP is an intrabar event.
+    """
     return _binance_kline(symbol, 1000, "5m", "SPOT", keep_forming=True)
 
 
-def check_take_profits(state, info, df):
-    active = state["active"].get(info["symbol"])
+def _trade_activation_time(active):
+    """Use the actual time the simulated trade became active.
+
+    Older state files may not have activated_at, so signal_time is retained as
+    a backwards-compatible fallback.
+    """
+    value = active.get("activated_at") or active.get("signal_time")
+    return pd.to_datetime(value, utc=True, errors="coerce")
+
+
+def check_take_profits(state, info, df=None):
+    """Detect every TP touched since the trade was actually activated.
+
+    TP is intentionally independent from the 4H scanner.  This function uses
+    live Binance 5m candles, so a TP touched and then retraced between two
+    GitHub Actions runs is still visible in the 5m High/Low.
+    """
+    active = state.get("active", {}).get(info["symbol"])
     if not active:
         return
 
@@ -1897,20 +1918,27 @@ def check_take_profits(state, info, df):
         print(f"{info['symbol']}: invalid live entry/side; skipping TP check.")
         return
 
-    entry_time = pd.to_datetime(active.get("signal_time"), utc=True, errors="coerce")
-    if pd.notna(entry_time):
-        monitor_df = monitor_df[monitor_df.index >= entry_time]
+    activation_time = _trade_activation_time(active)
+    if pd.notna(activation_time):
+        monitor_df = monitor_df[monitor_df.index >= activation_time]
     if monitor_df.empty:
         return
 
     levels = tp_levels_for_side(side)
+
+    # Process every unhit level.  If one candle crossed several levels, all of
+    # them are delivered in order instead of stopping after the first one.
     for index, (tp_name, tp_percent) in enumerate(levels):
         hit_key = tp_hit_key(tp_name)
         if active.get(hit_key, False) or tp_percent is None:
             continue
 
         tp_price = calculate_tp_price(entry, side, tp_percent)
-        hit_rows = monitor_df[monitor_df["High"] >= tp_price] if side == "BUY" else monitor_df[monitor_df["Low"] <= tp_price]
+        if side == "BUY":
+            hit_rows = monitor_df[monitor_df["High"] >= tp_price]
+        else:
+            hit_rows = monitor_df[monitor_df["Low"] <= tp_price]
+
         if hit_rows.empty:
             continue
 
@@ -1932,29 +1960,88 @@ def check_take_profits(state, info, df):
 
         delivery_key = f"TP|{info['symbol']}|{active['signal_id']}|{tp_name}"
         text = tp_text(info, active, tp_name, tp_percent, tp_price, new_sl)
+
+        # A Telegram failure must NOT mark the TP as hit.  It remains pending
+        # and will be retried on the next run.
         if not deliver_once(state, delivery_key, text):
             save_state(state)
             return
 
         active[hit_key] = True
         active["last_tp_hit"] = tp_name
-        active.setdefault("tp_hits", []).append({"name": tp_name, "percent": tp_percent, "price": float(tp_price), "time": hit_time, "new_sl": float(new_sl)})
+        active.setdefault("tp_hits", []).append({
+            "name": tp_name,
+            "percent": tp_percent,
+            "price": float(tp_price),
+            "time": hit_time,
+            "new_sl": float(new_sl),
+        })
         active["current_sl"] = float(new_sl)
         active["sl"] = float(new_sl)
+
         if tp_name == "TP1":
             active["tp1_hit"] = True
+        if tp_name == "TP2":
+            active["tp2_hit"] = True
+        if tp_name == "TP40":
+            active["full_tp_hit"] = True
+
         save_state(state)
 
-        print(f"{info['symbol']}: {tp_name} HIT | candle={hit_time} high={float(hit_candle['High']):.12g} low={float(hit_candle['Low']):.12g} target={tp_price:.12g} | SL -> {new_sl:.12g}")
+        high = float(hit_candle["High"])
+        low = float(hit_candle["Low"])
+        print(
+            f"{info['symbol']}: {tp_name} HIT | candle={hit_time} "
+            f"high={high:.12g} low={low:.12g} target={tp_price:.12g} "
+            f"| SL -> {new_sl:.12g}"
+        )
 
         if tp_name == "TP40":
-            closed = close_trade(state, info, active, tp_price, "FULL TP (TP40)", hit_time)
-            print(f"{info['symbol']}: TP40 / Full TP closed trade #{closed.get('trade_number')}")
+            closed = close_trade(
+                state,
+                info,
+                active,
+                tp_price,
+                "FULL TP (TP40)",
+                hit_time,
+            )
+            print(
+                f"{info['symbol']}: TP40 / Full TP closed trade "
+                f"#{closed.get('trade_number')}"
+            )
             return
 
     active["tp_last_scan_time"] = monitor_df.index[-1].isoformat()
     save_state(state)
 
+
+def check_all_active_take_profits(state, symbol_lookup):
+    """Run TP monitoring for ALL active trades before the 4H scan.
+
+    This is the important reliability fix: a 4H data failure, a temporary
+    Binance 4H timeout, or a symbol with no new signal must never prevent an
+    already-open trade from receiving its TP notification.
+    """
+    active_items = list(state.get("active", {}).items())
+    if not active_items:
+        return
+
+    print(f"TP monitor active trades: {len(active_items)}")
+    for symbol, active in active_items:
+        info = symbol_lookup.get(symbol)
+        if not info:
+            # Active trades created from an older state can still be monitored
+            # even if the symbol is no longer present in the current requested
+            # list.  Reconstruct the minimum metadata required by TP messages.
+            info = {
+                "symbol": symbol,
+                "name": active.get("name", symbol),
+                "market_source": "SPOT",
+            }
+        try:
+            check_take_profits(state, info, None)
+        except Exception as error:
+            print(f"{symbol}: TP monitor ERROR: {error}")
 
 # =========================================================
 # STOP LOSS CHECK
@@ -2372,9 +2459,8 @@ def add_ob_distance(signal, df):
 # =========================================================
 
 def analyze_symbol(state, info, df, monitor_df=None):
-    # TP uses rolling LIVE 5m Binance candles so TP touches are not lost.
-    # SL remains based on the latest completed 4H candle close.
-    check_take_profits(state, info, df)
+    # TP is monitored globally before the 4H scan. SL remains based on the
+    # latest completed 4H candle close.
     check_stop(state, info, df)
 
     signals = latest_signals(df)
@@ -2496,6 +2582,7 @@ def analyze_symbol(state, info, df, monitor_df=None):
         "sl": float(signal["sl"]),
         "entry_price": entry_price,
         "signal_time": signal["event_time"],
+        "activated_at": datetime.now(timezone.utc).isoformat(),
         "margin": margin,
         "notional": notional,
         "leverage": LEVERAGE,
@@ -2559,6 +2646,10 @@ def main():
     # Telegram commands are handled by the separate command workflow.
 
     binance_symbols = get_binance_spot_symbols()
+
+    symbol_lookup = {info["symbol"]: info for info in binance_symbols}
+    # IMPORTANT: TP monitoring is independent of the 4H scan.
+    check_all_active_take_profits(state, symbol_lookup)
 
     workers = max(1, min(BINANCE_SCAN_WORKERS, 32))
     print(f"Binance parallel scan workers: {workers}")
