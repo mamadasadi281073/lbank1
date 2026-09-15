@@ -518,7 +518,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-15T13:05:00+00:00"
+      "tp_last_scan_time": "2026-09-15T13:25:00+00:00"
     },
     "BARDUSDT": {
       "trade_number": 80,
@@ -601,7 +601,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-15T13:05:00+00:00"
+      "tp_last_scan_time": "2026-09-15T13:25:00+00:00"
     },
     "ALGOUSDT": {
       "trade_number": 81,
@@ -684,7 +684,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-15T13:05:00+00:00"
+      "tp_last_scan_time": "2026-09-15T13:25:00+00:00"
     }
   },
   "closed_trades": [],
