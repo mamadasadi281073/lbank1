@@ -467,7 +467,7 @@
       "notional": 100.0,
       "leverage": 10.0,
       "tp1_hit": true,
-      "tp2_hit": false,
+      "tp2_hit": true,
       "tp3_hit": false,
       "tp4_hit": false,
       "tp5_hit": false,
@@ -475,13 +475,20 @@
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "TP1",
+      "last_tp_hit": "TP2",
       "tp_hits": [
         {
           "name": "TP1",
           "percent": 1.0,
           "price": 0.01287,
           "time": "2026-09-15T12:50:00+00:00",
+          "new_sl": 0.013
+        },
+        {
+          "name": "TP2",
+          "percent": 2.0,
+          "price": 0.01274,
+          "time": "2026-09-15T13:45:00+00:00",
           "new_sl": 0.013
         }
       ],
@@ -518,7 +525,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-15T13:40:00+00:00"
+      "tp_last_scan_time": "2026-09-15T13:55:00+00:00"
     },
     "BARDUSDT": {
       "trade_number": 80,
@@ -608,7 +615,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-15T13:40:00+00:00"
+      "tp_last_scan_time": "2026-09-15T13:55:00+00:00"
     },
     "ALGOUSDT": {
       "trade_number": 81,
@@ -691,7 +698,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-15T13:40:00+00:00"
+      "tp_last_scan_time": "2026-09-15T13:55:00+00:00"
     }
   },
   "closed_trades": [],
@@ -980,6 +987,10 @@
       "-1002536113120": false
     },
     "TP|BARDUSDT|SELL|2026-09-15T08:00:00+00:00|394|0.127900000000|TP4": {
+      "1448700069": true,
+      "-1002536113120": false
+    },
+    "TP|AUDIOUSDT|SELL|2026-09-15T08:00:00+00:00|394|0.013000000000|TP2": {
       "1448700069": true,
       "-1002536113120": false
     }
@@ -1363,6 +1374,10 @@
     },
     "TP|BARDUSDT|SELL|2026-09-15T08:00:00+00:00|394|0.127900000000|TP4": {
       "text": "🎯 TP4 زده شد\n\n🔢 شماره معامله: #80\nنماد: BARDUSDT\nجهت: SELL\nقیمت هدف: 0.122784\nهدف: +4%\n🛡 SL جدید: 0.125342\n\n@Cryptososhiant",
+      "reply_markup": null
+    },
+    "TP|AUDIOUSDT|SELL|2026-09-15T08:00:00+00:00|394|0.013000000000|TP2": {
+      "text": "🎯 TP2 زده شد\n\n🔢 شماره معامله: #79\nنماد: AUDIOUSDT\nجهت: SELL\nقیمت هدف: 0.01274\nهدف: +2%\n🛡 SL جدید: 0.013\n\n@Cryptososhiant",
       "reply_markup": null
     }
   }
