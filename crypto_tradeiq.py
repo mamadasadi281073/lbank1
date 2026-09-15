@@ -27,12 +27,6 @@ BINANCE_SPOT_BASE = os.getenv(
     "https://data-api.binance.vision",
 ).rstrip("/")
 
-# Public Futures market-data source for symbols that are not available on
-# Binance Spot. OKX public market-data endpoints require no API key.
-OKX_FUTURES_BASE = os.getenv(
-    "OKX_FUTURES_BASE",
-    "https://www.okx.com",
-).rstrip("/")
 
 BINANCE_TIMEOUT = int(os.getenv("BINANCE_TIMEOUT", "15"))
 BINANCE_4H_BARS = int(os.getenv("BINANCE_4H_BARS", "400"))
@@ -215,6 +209,12 @@ def load_state():
 
     state.setdefault(
         "deliveries",
+        {},
+    )
+    # Messages that reached at least one Telegram target but failed on another
+    # target are kept here and retried on the next GitHub Actions run.
+    state.setdefault(
+        "pending_messages",
         {},
     )
 
@@ -912,6 +912,12 @@ def normalize_requested_symbol(value):
 
 
 def read_source_symbols():
+    """Read ONLY the symbols supplied by the user in coins.txt.
+
+    Binance is used only as the live market-data source. The scanner does
+    not expand the user's list to all Binance symbols and does not fall back
+    to another exchange.
+    """
     path = COINS_FILE
     if os.path.exists(path):
         rows = []
@@ -925,7 +931,10 @@ def read_source_symbols():
             print(f"Binance source file: {path} ({len(rows)} requested symbols)")
             return rows
 
-    print(f"{path} was not found or empty; using embedded fallback list ({len(FALLBACK_SOURCE_SYMBOLS)} symbols).")
+    print(
+        f"{path} was not found or empty; using embedded fallback list "
+        f"({len(FALLBACK_SOURCE_SYMBOLS)} symbols)."
+    )
     return list(FALLBACK_SOURCE_SYMBOLS)
 
 
@@ -957,122 +966,52 @@ def binance_json_get(path, params=None):
     raise RuntimeError(f"Binance request failed: {url} | {last_error}")
 
 
-def okx_json_get(path, params=None):
-    url = OKX_FUTURES_BASE.rstrip("/") + path
-    headers = {
-        "Accept": "application/json",
-        "User-Agent": "CryptoTradeIQ/1.0",
-    }
-    last_error = None
-    for attempt in range(3):
-        try:
-            response = requests.get(
-                url,
-                params=params or {},
-                headers=headers,
-                timeout=BINANCE_TIMEOUT,
-            )
-            response.raise_for_status()
-            payload = response.json()
-            if not isinstance(payload, dict):
-                raise RuntimeError(f"Unexpected OKX response: {payload!r}")
-            if str(payload.get("code", "0")) != "0":
-                raise RuntimeError(str(payload))
-            return payload
-        except Exception as error:
-            last_error = error
-            if attempt < 2:
-                import time
-                time.sleep(0.7 * (attempt + 1))
-    raise RuntimeError(f"OKX Futures request failed: {url} | {last_error}")
-
-
-def get_okx_futures_symbols(missing_bases):
-    """Resolve Spot-missing requested coins against OKX USDT linear perpetual SWAPs."""
-    if not missing_bases:
-        return []
-
-    wanted = {str(x).upper() for x in missing_bases}
-    rows = []
-    seen = set()
-    payload = okx_json_get(
-        "/api/v5/public/instruments",
-        {"instType": "SWAP"},
-    )
-    instruments = payload.get("data") or []
-
-    for item in instruments:
-        if not isinstance(item, dict):
-            continue
-        if str(item.get("instType") or "").upper() != "SWAP":
-            continue
-        if str(item.get("state") or "").lower() != "live":
-            continue
-        inst_id = str(item.get("instId") or "").upper()
-        if not inst_id.endswith("-USDT-SWAP"):
-            continue
-        base = str(item.get("baseCcy") or "").upper()
-        if not base:
-            parts = inst_id.split("-")
-            base = parts[0] if parts else ""
-        if not base or base not in wanted or base in seen:
-            continue
-
-        seen.add(base)
-        rows.append({
-            "symbol": inst_id,
-            "name": base,
-            "source_symbol": base + "USDT",
-            "spot_symbol": None,
-            "futures_symbol": inst_id,
-            "market_source": "OKX_FUTURES",
-            "base_currency": base,
-            "clear_currency": "USDT",
-            "price_tick": item.get("tickSz"),
-            "volume_tick": item.get("lotSz"),
-            "min_order_volume": item.get("minSz"),
-            "min_order_cost": None,
-            "default_leverage": None,
-        })
-
-    order = {base: i for i, base in enumerate(missing_bases)}
-    rows.sort(key=lambda row: order.get(row["name"], 999999))
-    return rows
-
 def get_binance_spot_symbols():
-    """Resolve requested coins against Binance Spot USDT markets."""
+    """Resolve ONLY the requested symbols against Binance Spot USDT.
+
+    Binance supplies the live symbol metadata and candles; no API key is used.
+    Missing requested symbols are skipped rather than replaced by another
+    exchange.
+    """
     requested = read_source_symbols()
+
+    payload = binance_json_get("/api/v3/exchangeInfo")
+    symbols = payload.get("symbols", []) if isinstance(payload, dict) else []
+
     requested_bases = []
     seen = set()
-
     for item in requested:
         base = normalize_requested_symbol(item)
         if base and base not in seen:
             seen.add(base)
             requested_bases.append(base)
 
-    payload = binance_json_get("/api/v3/exchangeInfo")
-    symbols = payload.get("symbols", []) if isinstance(payload, dict) else []
-
+    rows = []
     symbol_map = {}
     for item in symbols:
         if not isinstance(item, dict):
             continue
-        if item.get("status") != "TRADING":
+        if str(item.get("status") or "").upper() != "TRADING":
             continue
-        if item.get("quoteAsset") != "USDT":
+        if str(item.get("quoteAsset") or "").upper() != "USDT":
             continue
         symbol = str(item.get("symbol") or "").upper()
         base = str(item.get("baseAsset") or "").upper()
-        if symbol and base:
-            symbol_map.setdefault(base, item)
+        if not symbol or not base:
+            continue
+        symbol_map.setdefault(base, item)
 
-    rows = []
-    missing = []
+    missing = [base for base in requested_bases if base not in symbol_map]
+    print(f"Binance requested symbols : {len(requested_bases)}")
+    print(f"Binance Spot matched      : {len(requested_bases) - len(missing)}")
+    print(f"Binance Spot missing      : {len(missing)}")
+    if missing:
+        print("Unavailable on Binance Spot:", ", ".join(missing))
+
+    order = {base: i for i, base in enumerate(requested_bases)}
     for base in requested_bases:
         item = symbol_map.get(base)
         if not item:
-            missing.append(base)
             continue
         rows.append({
             "symbol": item["symbol"],
@@ -1090,35 +1029,11 @@ def get_binance_spot_symbols():
             "default_leverage": None,
         })
 
-    order = {base: i for i, base in enumerate(requested_bases)}
     rows.sort(key=lambda row: order.get(normalize_requested_symbol(row["source_symbol"]), 999999))
-
-    print(f"Binance requested symbols : {len(requested_bases)}")
     print(f"Binance Spot matched      : {len(rows)}")
-    print(f"Binance Spot missing      : {len(missing)}")
-
-    # Anything missing from Spot is checked on USDⓈ-M Futures.
-    futures_rows = []
-    if missing:
-        try:
-            futures_rows = get_okx_futures_symbols(missing)
-        except Exception as error:
-            print(f"OKX Futures symbol lookup failed: {error}")
-
-    futures_bases = {row["name"] for row in futures_rows}
-    still_missing = [base for base in missing if base not in futures_bases]
-
-    print(f"OKX Futures matched      : {len(futures_rows)}")
-    print(f"Unavailable on Binance Spot and OKX Futures    : {len(still_missing)}")
-    if still_missing:
-        print("Not listed on Binance Spot or OKX USDT Perpetual SWAP: " + ", ".join(still_missing))
-
-    combined = rows + futures_rows
-    combined.sort(key=lambda row: order.get(normalize_requested_symbol(row["source_symbol"]), 999999))
-
-    if not combined:
-        raise RuntimeError("None of the requested coins are available on Binance Spot or OKX USDT Perpetual SWAP.")
-    return combined
+    if not rows:
+        raise RuntimeError("No Binance Spot USDT symbols are available.")
+    return rows
 
 
 # =========================================================
@@ -1126,32 +1041,21 @@ def get_binance_spot_symbols():
 # =========================================================
 
 def _binance_kline(symbol, size, interval, market_source="SPOT", keep_forming=False):
-    source = str(market_source or "SPOT").upper()
-    requested_size = min(int(size), 1440 if source == "OKX_FUTURES" else (1500 if source == "SPOT" else 1000))
-    try:
-        if source == "OKX_FUTURES":
-            # OKX public market data: no API key is required.
-            # 4H is the requested 4-hour bar; 1D is the daily bar.
-            okx_bar = "4H" if interval == "4h" else ("1D" if interval == "1d" else str(interval))
-            payload = okx_json_get(
-                "/api/v5/market/candles",
-                {
-                    "instId": symbol,
-                    "bar": okx_bar,
-                    "limit": requested_size,
-                },
-            )
-            payload_rows = payload.get("data") or []
-        else:
-            payload_rows = binance_json_get(
-                "/api/v3/klines",
-                {
-                    "symbol": symbol,
-                    "interval": interval,
-                    "limit": requested_size,
-                },
-            )
+    """Fetch live Binance Spot candles from the public no-auth endpoint.
 
+    The response includes the currently forming candle. Signal/SL logic uses
+    completed candles, while TP monitoring intentionally keeps the live candle.
+    """
+    requested_size = min(int(size), 1500)
+    try:
+        payload_rows = binance_json_get(
+            "/api/v3/klines",
+            {
+                "symbol": symbol,
+                "interval": interval,
+                "limit": requested_size,
+            },
+        )
         if not isinstance(payload_rows, list) or not payload_rows:
             raise RuntimeError(f"Empty Kline response for {symbol} {interval}")
 
@@ -1160,15 +1064,12 @@ def _binance_kline(symbol, size, interval, market_source="SPOT", keep_forming=Fa
             if not isinstance(item, (list, tuple)) or len(item) < 6:
                 continue
             try:
-                # OKX: [ts,o,h,l,c,vol,volCcy,volCcyQuote,confirm]
-                # Binance: [openTime,o,h,l,c,vol,...]
                 rows.append({
                     "Time": pd.to_datetime(int(item[0]), unit="ms", utc=True),
                     "Open": float(item[1]),
                     "High": float(item[2]),
                     "Low": float(item[3]),
                     "Close": float(item[4]),
-                    "_confirm": str(item[8]) if source == "OKX_FUTURES" and len(item) > 8 else "1",
                 })
             except (TypeError, ValueError):
                 continue
@@ -1182,21 +1083,14 @@ def _binance_kline(symbol, size, interval, market_source="SPOT", keep_forming=Fa
             .sort_values("Time")
             .set_index("Time")
         )
-        df = df[["Open", "High", "Low", "Close", "_confirm"]].dropna().copy()
+        df = df[["Open", "High", "Low", "Close"]].dropna().copy()
 
-        if source == "OKX_FUTURES":
-            # OKX explicitly marks the live candle with confirm=0.
-            # For scanner data we use completed candles only.
-            if not keep_forming and len(df) > 1:
-                df = df[df["_confirm"] == "1"].copy()
-        elif not keep_forming and len(df) > 1:
-            # Binance Spot endpoint returns the currently forming candle too.
+        if not keep_forming and len(df) > 1:
             df = df.iloc[:-1].copy()
 
-        df = df.drop(columns=["_confirm"])
         return df
     except Exception as error:
-        print(f"{source} Kline request failed: {symbol} {interval}: {error}")
+        print(f"Binance Kline request failed: {symbol} {interval}: {error}")
         return None
 
 
@@ -1213,14 +1107,19 @@ def _cached_download(key, loader):
     return value
 
 
+def download_4h_bundle(symbol, market_source="SPOT"):
+    """One live request -> completed candles for signals/SL + live candle for TP."""
+    df_live = _binance_kline(symbol, BINANCE_4H_BARS, "4h", "SPOT", keep_forming=True)
+    if df_live is None or len(df_live) < 3:
+        return None, None
+    completed = df_live.iloc[:-1].copy()
+    return completed, df_live
+
 def download_4h(symbol, market_source="SPOT"):
     source = str(market_source or "SPOT").upper()
     return _cached_download(("4h", source, symbol), lambda: _binance_kline(symbol, BINANCE_4H_BARS, "4h", source, keep_forming=False))
 
-
 def download_4h_monitor(symbol, market_source="SPOT"):
-    # Live/current 4H candle is intentionally retained for TP monitoring.
-    # This is separate from signal generation, which always uses completed bars.
     source = str(market_source or "SPOT").upper()
     return _binance_kline(symbol, max(50, min(BINANCE_4H_BARS, 300)), "4h", source, keep_forming=True)
 
@@ -1552,88 +1451,91 @@ def send_telegram_to_target(
         timeout=30,
     )
 
-    response.raise_for_status()
+    try:
+        data = response.json()
+    except Exception:
+        data = {"ok": False, "raw": response.text}
 
-    data = response.json()
-
-    if not data.get("ok"):
-
-        raise RuntimeError(
-            str(data)
-        )
+    if not response.ok or not data.get("ok"):
+        raise RuntimeError(f"Telegram HTTP {response.status_code}: {data}")
 
     return True
 
 
-def deliver_once(
-    state,
-    delivery_key,
-    text,
-    reply_markup=None,
-):
-
+def deliver_once(state, delivery_key, text, reply_markup=None):
+    """Deliver once per Telegram target without allowing one bad target to
+    block TP/SL state. Failed targets are persisted and retried later."""
     targets = telegram_targets()
-
     if not targets:
-
-        print(
-            "No Telegram targets configured."
-        )
-
+        print("No Telegram targets configured.")
         return False
 
-    delivery_state = (
-        state["deliveries"]
-        .setdefault(
-            delivery_key,
-            {},
-        )
-    )
+    delivery_state = state["deliveries"].setdefault(delivery_key, {})
+    pending = state.setdefault("pending_messages", {})
+    delivered_any = False
+    failed = False
 
     for chat_id in targets:
+        if delivery_state.get(chat_id) is True:
+            delivered_any = True
+            continue
+        try:
+            send_telegram_to_target(chat_id, text, reply_markup=reply_markup)
+            delivery_state[chat_id] = True
+            delivered_any = True
+            print(f"Delivered {delivery_key} -> {chat_id}")
+        except Exception as error:
+            delivery_state[chat_id] = False
+            failed = True
+            print(f"Telegram delivery failed for {chat_id}: {error}")
 
-        if (
-            delivery_state.get(
-                chat_id
-            )
-            is True
-        ):
+    if failed:
+        pending[delivery_key] = {
+            "text": text,
+            "reply_markup": reply_markup,
+        }
+    else:
+        pending.pop(delivery_key, None)
 
+    return delivered_any
+
+def retry_pending_telegram_deliveries(state):
+    """Retry persisted Telegram messages for targets that have not received them."""
+    targets = telegram_targets()
+    if not targets:
+        return
+
+    pending = state.setdefault("pending_messages", {})
+    deliveries = state.setdefault("deliveries", {})
+
+    for delivery_key, payload in list(pending.items()):
+        if not isinstance(payload, dict):
+            pending.pop(delivery_key, None)
+            continue
+        text = payload.get("text", "")
+        reply_markup = payload.get("reply_markup")
+        if not text:
+            pending.pop(delivery_key, None)
             continue
 
-        try:
+        per_target = deliveries.setdefault(delivery_key, {})
+        failed = False
+        for chat_id in targets:
+            if per_target.get(chat_id) is True:
+                continue
+            try:
+                send_telegram_to_target(chat_id, text, reply_markup=reply_markup)
+                per_target[chat_id] = True
+                print(f"Retry delivered {delivery_key} -> {chat_id}")
+            except Exception as error:
+                per_target[chat_id] = False
+                failed = True
+                print(f"Retry Telegram delivery failed for {chat_id}: {error}")
 
-            send_telegram_to_target(
-                chat_id,
-                text,
-                reply_markup=reply_markup,
-            )
+        if not failed:
+            pending.pop(delivery_key, None)
 
-            delivery_state[
-                chat_id
-            ] = True
-
-            print(
-                f"Delivered "
-                f"{delivery_key} -> "
-                f"{chat_id}"
-            )
-
-        except Exception as error:
-
-            print(
-                "Telegram delivery "
-                "failed for "
-                f"{chat_id}: {error}"
-            )
-
-    return all(
-        delivery_state.get(
-            chat_id
-        )
-        is True
-        for chat_id in targets
-    )
+    save_state(state)
 
 
 # =========================================================
@@ -1973,51 +1875,59 @@ def calculate_tp_price(
 # TAKE PROFIT CHECK
 # =========================================================
 
+def download_tp_monitor(symbol):
+    """Fetch recent LIVE 5m Binance candles for TP detection."""
+    return _binance_kline(symbol, 1000, "5m", "SPOT", keep_forming=True)
+
+
 def check_take_profits(state, info, df):
     active = state["active"].get(info["symbol"])
-    if not active or len(df) < 2:
+    if not active:
         return
-    # TP is monitored from the newest available candle so the 5-minute
-    # GitHub Actions worker can report an intrabar TP hit without waiting
-    # for the 4H candle to close. Signal generation itself still uses only
-    # completed 4H candles.
-    monitor_idx = -1
-    high = float(df["High"].iloc[monitor_idx])
-    low = float(df["Low"].iloc[monitor_idx])
+
+    monitor_df = download_tp_monitor(info["symbol"])
+    if monitor_df is None or monitor_df.empty:
+        print(f"{info['symbol']}: TP monitor data unavailable; keeping trade open.")
+        return
+
     try:
         entry = float(active["entry_price"])
-        side = active["side"]
+        side = str(active["side"]).upper()
     except (KeyError, TypeError, ValueError):
-        print(f"{info['symbol']}: active trade has no valid entry_price; skipping TP check.")
+        print(f"{info['symbol']}: invalid live entry/side; skipping TP check.")
         return
-    levels = tp_levels_for_side(side)
 
+    entry_time = pd.to_datetime(active.get("signal_time"), utc=True, errors="coerce")
+    if pd.notna(entry_time):
+        monitor_df = monitor_df[monitor_df.index >= entry_time]
+    if monitor_df.empty:
+        return
+
+    levels = tp_levels_for_side(side)
     for index, (tp_name, tp_percent) in enumerate(levels):
         hit_key = tp_hit_key(tp_name)
-        if active.get(hit_key, False):
-            continue
-        if tp_percent is None:
-            continue
-        tp_price = calculate_tp_price(entry, side, tp_percent)
-        hit = high >= tp_price if side == "BUY" else low <= tp_price
-        if not hit:
+        if active.get(hit_key, False) or tp_percent is None:
             continue
 
-        # Trailing rule:
-        # TP1 keeps original SL.
-        # TP2 moves SL to entry.
-        # TP3-TP8 move SL two TP levels back (old behavior).
-        # From TP9 onward SL moves to the immediately previous TP.
-        # TP40 is the final / FULL TP and closes the trade.
+        tp_price = calculate_tp_price(entry, side, tp_percent)
+        hit_rows = monitor_df[monitor_df["High"] >= tp_price] if side == "BUY" else monitor_df[monitor_df["Low"] <= tp_price]
+        if hit_rows.empty:
+            continue
+
+        hit_candle = hit_rows.iloc[0]
+        hit_time = hit_rows.index[0].isoformat()
+
         if index == 0:
             new_sl = float(active.get("current_sl", active.get("initial_sl", active["sl"])))
         elif index == 1:
             new_sl = entry
         elif index >= 8:
-            previous_name, previous_percent = levels[index - 1]
+            _, previous_percent = levels[index - 1]
+            if previous_percent is None:
+                continue
             new_sl = calculate_tp_price(entry, side, previous_percent)
         else:
-            previous_name, previous_percent = levels[index - 2]
+            _, previous_percent = levels[index - 2]
             new_sl = calculate_tp_price(entry, side, previous_percent)
 
         delivery_key = f"TP|{info['symbol']}|{active['signal_id']}|{tp_name}"
@@ -2028,17 +1938,22 @@ def check_take_profits(state, info, df):
 
         active[hit_key] = True
         active["last_tp_hit"] = tp_name
-        active.setdefault("tp_hits", []).append({"name": tp_name, "percent": tp_percent, "price": float(tp_price), "time": utc_now(), "new_sl": float(new_sl)})
+        active.setdefault("tp_hits", []).append({"name": tp_name, "percent": tp_percent, "price": float(tp_price), "time": hit_time, "new_sl": float(new_sl)})
         active["current_sl"] = float(new_sl)
         active["sl"] = float(new_sl)
+        if tp_name == "TP1":
+            active["tp1_hit"] = True
         save_state(state)
 
-        print(f"{info['symbol']}: {tp_name} hit at {tp_price:.12g}; SL -> {new_sl:.12g}")
+        print(f"{info['symbol']}: {tp_name} HIT | candle={hit_time} high={float(hit_candle['High']):.12g} low={float(hit_candle['Low']):.12g} target={tp_price:.12g} | SL -> {new_sl:.12g}")
 
         if tp_name == "TP40":
-            closed = close_trade(state, info, active, tp_price, "FULL TP (TP40)", df.index[monitor_idx].isoformat())
+            closed = close_trade(state, info, active, tp_price, "FULL TP (TP40)", hit_time)
             print(f"{info['symbol']}: TP40 / Full TP closed trade #{closed.get('trade_number')}")
             return
+
+    active["tp_last_scan_time"] = monitor_df.index[-1].isoformat()
+    save_state(state)
 
 
 # =========================================================
@@ -2057,7 +1972,7 @@ def check_stop(state, info, df):
 
     try:
         # SL is based on the close of a fully completed 4H candle.
-        close = float(df["Close"].iloc[-2])
+        close = float(df["Close"].iloc[-1])
         sl = float(active.get("current_sl", active.get("sl")))
         entry = float(active["entry_price"])
     except (KeyError, TypeError, ValueError):
@@ -2066,7 +1981,7 @@ def check_stop(state, info, df):
     hit = close < sl if active["side"] == "BUY" else close > sl
     if not hit:
         return
-    candle_time = df.index[-2].isoformat()
+    candle_time = df.index[-1].isoformat()
     delivery_key = f"STOP|{info['symbol']}|{active['signal_id']}|{candle_time}|{sl:.12g}"
     # PnL is calculated once, after the stop notification is successfully delivered.
     pnl = trade_pnl(float(active["entry_price"]), sl, active["side"], float(active.get("notional", 0.0)))
@@ -2456,12 +2371,10 @@ def add_ob_distance(signal, df):
 # ANALYZE SYMBOL
 # =========================================================
 
-def analyze_symbol(state, info, df):
-    # TP uses the live/current 4H candle from a live public API.
-    # SL remains based on a completed 4H candle close.
-    monitor_df = download_4h_monitor(info["symbol"], info.get("market_source", "SPOT"))
-    if monitor_df is not None and len(monitor_df) >= 2:
-        check_take_profits(state, info, monitor_df)
+def analyze_symbol(state, info, df, monitor_df=None):
+    # TP uses rolling LIVE 5m Binance candles so TP touches are not lost.
+    # SL remains based on the latest completed 4H candle close.
+    check_take_profits(state, info, df)
     check_stop(state, info, df)
 
     signals = latest_signals(df)
@@ -2640,6 +2553,9 @@ def main():
     state = load_state()
     update_period_openings(state)
     record_equity_point(state, "heartbeat")
+    # Retry any TP/SL/signal messages that reached one Telegram target but
+    # failed on another target during a previous run.
+    retry_pending_telegram_deliveries(state)
     # Telegram commands are handled by the separate command workflow.
 
     binance_symbols = get_binance_spot_symbols()
@@ -2649,25 +2565,25 @@ def main():
 
     results = {}
     with ThreadPoolExecutor(max_workers=workers) as executor:
-        future_map = {executor.submit(download_4h, info["symbol"], info.get("market_source", "SPOT")): info for info in binance_symbols}
+        future_map = {executor.submit(download_4h_bundle, info["symbol"], "SPOT"): info for info in binance_symbols}
         for future in as_completed(future_map):
             info = future_map[future]
             symbol = info["symbol"]
             try:
                 results[symbol] = future.result()
             except Exception as error:
-                results[symbol] = None
+                results[symbol] = (None, None)
                 print(f"{symbol}: ERROR: {error}")
 
     for info in binance_symbols:
         symbol = info["symbol"]
-        df = results.get(symbol)
+        df, monitor_df = results.get(symbol, (None, None))
         if df is None or len(df) < 30:
             print(f"{symbol}: insufficient data")
             continue
-        print(f"{symbol} [{info.get('market_source', 'SPOT')}] rows={len(df)}")
+        print(f"{symbol} [SPOT] rows={len(df)}")
         try:
-            analyze_symbol(state, info, df)
+            analyze_symbol(state, info, df, monitor_df=monitor_df)
         except Exception as error:
             print(f"{symbol}: ERROR: {error}")
 
