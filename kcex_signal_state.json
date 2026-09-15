@@ -458,8 +458,8 @@
       "signal_id": "SELL|2026-09-15T08:00:00+00:00|394|0.013000000000",
       "side": "SELL",
       "initial_sl": 0.013,
-      "current_sl": 0.013,
-      "sl": 0.013,
+      "current_sl": 0.01274,
+      "sl": 0.01274,
       "entry_price": 0.013,
       "signal_time": "2026-09-15T08:00:00+00:00",
       "activated_at": "2026-09-15T12:16:28.859721+00:00",
@@ -468,14 +468,14 @@
       "leverage": 10.0,
       "tp1_hit": true,
       "tp2_hit": true,
-      "tp3_hit": false,
-      "tp4_hit": false,
+      "tp3_hit": true,
+      "tp4_hit": true,
       "tp5_hit": false,
       "tp6_hit": false,
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "TP2",
+      "last_tp_hit": "TP4",
       "tp_hits": [
         {
           "name": "TP1",
@@ -490,6 +490,20 @@
           "price": 0.01274,
           "time": "2026-09-15T13:45:00+00:00",
           "new_sl": 0.013
+        },
+        {
+          "name": "TP3",
+          "percent": 3.0,
+          "price": 0.01261,
+          "time": "2026-09-15T14:35:00+00:00",
+          "new_sl": 0.01287
+        },
+        {
+          "name": "TP4",
+          "percent": 4.0,
+          "price": 0.01248,
+          "time": "2026-09-15T14:45:00+00:00",
+          "new_sl": 0.01274
         }
       ],
       "balance_at_entry": 100.0,
@@ -525,7 +539,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-15T14:30:00+00:00"
+      "tp_last_scan_time": "2026-09-15T14:45:00+00:00"
     },
     "BARDUSDT": {
       "trade_number": 80,
@@ -615,7 +629,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-15T14:30:00+00:00"
+      "tp_last_scan_time": "2026-09-15T14:45:00+00:00"
     },
     "ALGOUSDT": {
       "trade_number": 81,
@@ -624,8 +638,8 @@
       "signal_id": "SELL|2026-09-15T08:00:00+00:00|394|0.098300000000",
       "side": "SELL",
       "initial_sl": 0.0983,
-      "current_sl": 0.097317,
-      "sl": 0.097317,
+      "current_sl": 0.096334,
+      "sl": 0.096334,
       "entry_price": 0.0983,
       "signal_time": "2026-09-15T08:00:00+00:00",
       "activated_at": "2026-09-15T12:16:32.954163+00:00",
@@ -635,13 +649,13 @@
       "tp1_hit": true,
       "tp2_hit": true,
       "tp3_hit": true,
-      "tp4_hit": false,
+      "tp4_hit": true,
       "tp5_hit": false,
       "tp6_hit": false,
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "TP3",
+      "last_tp_hit": "TP4",
       "tp_hits": [
         {
           "name": "TP1",
@@ -663,6 +677,13 @@
           "price": 0.09535099999999999,
           "time": "2026-09-15T12:20:00+00:00",
           "new_sl": 0.097317
+        },
+        {
+          "name": "TP4",
+          "percent": 4.0,
+          "price": 0.094368,
+          "time": "2026-09-15T14:40:00+00:00",
+          "new_sl": 0.096334
         }
       ],
       "balance_at_entry": 100.0,
@@ -698,7 +719,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-15T14:30:00+00:00"
+      "tp_last_scan_time": "2026-09-15T14:45:00+00:00"
     }
   },
   "closed_trades": [],
@@ -991,6 +1012,18 @@
       "-1002536113120": false
     },
     "TP|AUDIOUSDT|SELL|2026-09-15T08:00:00+00:00|394|0.013000000000|TP2": {
+      "1448700069": true,
+      "-1002536113120": false
+    },
+    "TP|AUDIOUSDT|SELL|2026-09-15T08:00:00+00:00|394|0.013000000000|TP3": {
+      "1448700069": true,
+      "-1002536113120": false
+    },
+    "TP|AUDIOUSDT|SELL|2026-09-15T08:00:00+00:00|394|0.013000000000|TP4": {
+      "1448700069": true,
+      "-1002536113120": false
+    },
+    "TP|ALGOUSDT|SELL|2026-09-15T08:00:00+00:00|394|0.098300000000|TP4": {
       "1448700069": true,
       "-1002536113120": false
     }
@@ -1378,6 +1411,18 @@
     },
     "TP|AUDIOUSDT|SELL|2026-09-15T08:00:00+00:00|394|0.013000000000|TP2": {
       "text": "🎯 TP2 زده شد\n\n🔢 شماره معامله: #79\nنماد: AUDIOUSDT\nجهت: SELL\nقیمت هدف: 0.01274\nهدف: +2%\n🛡 SL جدید: 0.013\n\n@Cryptososhiant",
+      "reply_markup": null
+    },
+    "TP|AUDIOUSDT|SELL|2026-09-15T08:00:00+00:00|394|0.013000000000|TP3": {
+      "text": "🎯 TP3 زده شد\n\n🔢 شماره معامله: #79\nنماد: AUDIOUSDT\nجهت: SELL\nقیمت هدف: 0.01261\nهدف: +3%\n🛡 SL جدید: 0.01287\n\n@Cryptososhiant",
+      "reply_markup": null
+    },
+    "TP|AUDIOUSDT|SELL|2026-09-15T08:00:00+00:00|394|0.013000000000|TP4": {
+      "text": "🎯 TP4 زده شد\n\n🔢 شماره معامله: #79\nنماد: AUDIOUSDT\nجهت: SELL\nقیمت هدف: 0.01248\nهدف: +4%\n🛡 SL جدید: 0.01274\n\n@Cryptososhiant",
+      "reply_markup": null
+    },
+    "TP|ALGOUSDT|SELL|2026-09-15T08:00:00+00:00|394|0.098300000000|TP4": {
+      "text": "🎯 TP4 زده شد\n\n🔢 شماره معامله: #81\nنماد: ALGOUSDT\nجهت: SELL\nقیمت هدف: 0.094368\nهدف: +4%\n🛡 SL جدید: 0.096334\n\n@Cryptososhiant",
       "reply_markup": null
     }
   }
