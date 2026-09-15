@@ -539,7 +539,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-15T18:25:00+00:00"
+      "tp_last_scan_time": "2026-09-15T18:45:00+00:00"
     },
     "BARDUSDT": {
       "trade_number": 80,
@@ -636,7 +636,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-15T18:25:00+00:00"
+      "tp_last_scan_time": "2026-09-15T18:45:00+00:00"
     },
     "ALGOUSDT": {
       "trade_number": 81,
@@ -645,8 +645,8 @@
       "signal_id": "SELL|2026-09-15T08:00:00+00:00|394|0.098300000000",
       "side": "SELL",
       "initial_sl": 0.0983,
-      "current_sl": 0.09535099999999999,
-      "sl": 0.09535099999999999,
+      "current_sl": 0.094368,
+      "sl": 0.094368,
       "entry_price": 0.0983,
       "signal_time": "2026-09-15T08:00:00+00:00",
       "activated_at": "2026-09-15T12:16:32.954163+00:00",
@@ -658,11 +658,11 @@
       "tp3_hit": true,
       "tp4_hit": true,
       "tp5_hit": true,
-      "tp6_hit": false,
+      "tp6_hit": true,
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "TP5",
+      "last_tp_hit": "TP6",
       "tp_hits": [
         {
           "name": "TP1",
@@ -698,6 +698,13 @@
           "price": 0.093385,
           "time": "2026-09-15T14:50:00+00:00",
           "new_sl": 0.09535099999999999
+        },
+        {
+          "name": "TP6",
+          "percent": 8.0,
+          "price": 0.090436,
+          "time": "2026-09-15T18:40:00+00:00",
+          "new_sl": 0.094368
         }
       ],
       "balance_at_entry": 100.0,
@@ -733,7 +740,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-15T18:25:00+00:00"
+      "tp_last_scan_time": "2026-09-15T18:45:00+00:00"
     },
     "IDUSDT": {
       "trade_number": 82,
@@ -742,8 +749,8 @@
       "signal_id": "SELL|2026-09-15T12:00:00+00:00|393|0.033900000000",
       "side": "SELL",
       "initial_sl": 0.0339,
-      "current_sl": 0.033222,
-      "sl": 0.033222,
+      "current_sl": 0.032882999999999996,
+      "sl": 0.032882999999999996,
       "entry_price": 0.0339,
       "signal_time": "2026-09-15T12:00:00+00:00",
       "activated_at": "2026-09-15T16:18:14.743327+00:00",
@@ -754,12 +761,12 @@
       "tp2_hit": true,
       "tp3_hit": true,
       "tp4_hit": true,
-      "tp5_hit": false,
+      "tp5_hit": true,
       "tp6_hit": false,
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "TP4",
+      "last_tp_hit": "TP5",
       "tp_hits": [
         {
           "name": "TP1",
@@ -788,6 +795,13 @@
           "price": 0.032544,
           "time": "2026-09-15T16:20:00+00:00",
           "new_sl": 0.033222
+        },
+        {
+          "name": "TP5",
+          "percent": 5.0,
+          "price": 0.032205,
+          "time": "2026-09-15T18:40:00+00:00",
+          "new_sl": 0.032882999999999996
         }
       ],
       "balance_at_entry": 100.0,
@@ -823,7 +837,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-15T18:25:00+00:00"
+      "tp_last_scan_time": "2026-09-15T18:45:00+00:00"
     }
   },
   "closed_trades": [],
@@ -1156,6 +1170,14 @@
       "-1002536113120": false
     },
     "TP|IDUSDT|SELL|2026-09-15T12:00:00+00:00|393|0.033900000000|TP4": {
+      "1448700069": true,
+      "-1002536113120": false
+    },
+    "TP|ALGOUSDT|SELL|2026-09-15T08:00:00+00:00|394|0.098300000000|TP6": {
+      "1448700069": true,
+      "-1002536113120": false
+    },
+    "TP|IDUSDT|SELL|2026-09-15T12:00:00+00:00|393|0.033900000000|TP5": {
       "1448700069": true,
       "-1002536113120": false
     }
@@ -1595,6 +1617,14 @@
     },
     "TP|IDUSDT|SELL|2026-09-15T12:00:00+00:00|393|0.033900000000|TP4": {
       "text": "🎯 TP4 زده شد\n\n🔢 شماره معامله: #82\nنماد: IDUSDT\nجهت: SELL\nقیمت هدف: 0.032544\nهدف: +4%\n🛡 SL جدید: 0.033222\n\n@Cryptososhiant",
+      "reply_markup": null
+    },
+    "TP|ALGOUSDT|SELL|2026-09-15T08:00:00+00:00|394|0.098300000000|TP6": {
+      "text": "🎯 TP6 زده شد\n\n🔢 شماره معامله: #81\nنماد: ALGOUSDT\nجهت: SELL\nقیمت هدف: 0.090436\nهدف: +8%\n🛡 SL جدید: 0.094368\n\n@Cryptososhiant",
+      "reply_markup": null
+    },
+    "TP|IDUSDT|SELL|2026-09-15T12:00:00+00:00|393|0.033900000000|TP5": {
+      "text": "🎯 TP5 زده شد\n\n🔢 شماره معامله: #82\nنماد: IDUSDT\nجهت: SELL\nقیمت هدف: 0.032205\nهدف: +5%\n🛡 SL جدید: 0.032883\n\n@Cryptososhiant",
       "reply_markup": null
     }
   }
