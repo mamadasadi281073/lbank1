@@ -967,5 +967,6 @@
     "GPRO-USDT-SWAP": "2026-09-14T12:00:00+00:00",
     "AMC-USDT-SWAP": "2026-09-14T08:00:00+00:00"
   },
-  "weekly_stats": {}
+  "weekly_stats": {},
+  "pending_messages": {}
 }
