@@ -546,7 +546,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-15T21:55:00+00:00"
+      "tp_last_scan_time": "2026-09-15T22:10:00+00:00"
     },
     "BARDUSDT": {
       "trade_number": 80,
@@ -643,7 +643,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-15T21:55:00+00:00"
+      "tp_last_scan_time": "2026-09-15T22:10:00+00:00"
     },
     "ALGOUSDT": {
       "trade_number": 81,
@@ -652,8 +652,8 @@
       "signal_id": "SELL|2026-09-15T08:00:00+00:00|394|0.098300000000",
       "side": "SELL",
       "initial_sl": 0.0983,
-      "current_sl": 0.094368,
-      "sl": 0.094368,
+      "current_sl": 0.093385,
+      "sl": 0.093385,
       "entry_price": 0.0983,
       "signal_time": "2026-09-15T08:00:00+00:00",
       "activated_at": "2026-09-15T12:16:32.954163+00:00",
@@ -666,10 +666,10 @@
       "tp4_hit": true,
       "tp5_hit": true,
       "tp6_hit": true,
-      "tp7_hit": false,
+      "tp7_hit": true,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "TP6",
+      "last_tp_hit": "TP7",
       "tp_hits": [
         {
           "name": "TP1",
@@ -712,6 +712,13 @@
           "price": 0.090436,
           "time": "2026-09-15T18:40:00+00:00",
           "new_sl": 0.094368
+        },
+        {
+          "name": "TP7",
+          "percent": 10.0,
+          "price": 0.08847000000000001,
+          "time": "2026-09-15T22:00:00+00:00",
+          "new_sl": 0.093385
         }
       ],
       "balance_at_entry": 100.0,
@@ -747,7 +754,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-15T21:55:00+00:00"
+      "tp_last_scan_time": "2026-09-15T22:10:00+00:00"
     },
     "IDUSDT": {
       "trade_number": 82,
@@ -844,7 +851,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-15T21:55:00+00:00"
+      "tp_last_scan_time": "2026-09-15T22:10:00+00:00"
     },
     "KMNOUSDT": {
       "trade_number": 83,
@@ -913,7 +920,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-15T21:55:00+00:00"
+      "tp_last_scan_time": "2026-09-15T22:10:00+00:00"
     }
   },
   "closed_trades": [],
@@ -1270,6 +1277,10 @@
       "-1002536113120": false
     },
     "TP|KMNOUSDT|BUY|2026-09-15T16:00:00+00:00|394|0.024680000000|TP1": {
+      "1448700069": true,
+      "-1002536113120": false
+    },
+    "TP|ALGOUSDT|SELL|2026-09-15T08:00:00+00:00|394|0.098300000000|TP7": {
       "1448700069": true,
       "-1002536113120": false
     }
@@ -1745,6 +1756,10 @@
     },
     "TP|KMNOUSDT|BUY|2026-09-15T16:00:00+00:00|394|0.024680000000|TP1": {
       "text": "🎯 TP1 زده شد\n\n🔢 شماره معامله: #83\nنماد: KMNOUSDT\nجهت: BUY\nقیمت هدف: 0.0249268\nهدف: +1%\n🛡 SL جدید: 0.02468\n\n@Cryptososhiant",
+      "reply_markup": null
+    },
+    "TP|ALGOUSDT|SELL|2026-09-15T08:00:00+00:00|394|0.098300000000|TP7": {
+      "text": "🎯 TP7 زده شد\n\n🔢 شماره معامله: #81\nنماد: ALGOUSDT\nجهت: SELL\nقیمت هدف: 0.08847\nهدف: +10%\n🛡 SL جدید: 0.093385\n\n@Cryptososhiant",
       "reply_markup": null
     }
   }
