@@ -546,7 +546,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T00:25:00+00:00"
+      "tp_last_scan_time": "2026-09-16T00:45:00+00:00"
     },
     "BARDUSDT": {
       "trade_number": 80,
@@ -643,7 +643,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T00:25:00+00:00"
+      "tp_last_scan_time": "2026-09-16T00:45:00+00:00"
     },
     "ALGOUSDT": {
       "trade_number": 81,
@@ -754,7 +754,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T00:25:00+00:00"
+      "tp_last_scan_time": "2026-09-16T00:45:00+00:00"
     },
     "IDUSDT": {
       "trade_number": 82,
@@ -851,7 +851,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T00:25:00+00:00"
+      "tp_last_scan_time": "2026-09-16T00:45:00+00:00"
     },
     "KMNOUSDT": {
       "trade_number": 83,
@@ -920,7 +920,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T00:25:00+00:00"
+      "tp_last_scan_time": "2026-09-16T00:45:00+00:00"
     },
     "NXPCUSDT": {
       "trade_number": 84,
@@ -937,7 +937,7 @@
       "margin": 10.0,
       "notional": 100.0,
       "leverage": 10.0,
-      "tp1_hit": false,
+      "tp1_hit": true,
       "tp2_hit": false,
       "tp3_hit": false,
       "tp4_hit": false,
@@ -946,8 +946,16 @@
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "",
-      "tp_hits": [],
+      "last_tp_hit": "TP1",
+      "tp_hits": [
+        {
+          "name": "TP1",
+          "percent": 1.0,
+          "price": 0.21119100000000002,
+          "time": "2026-09-16T00:40:00+00:00",
+          "new_sl": 0.2091
+        }
+      ],
       "balance_at_entry": 100.0,
       "tp9_hit": false,
       "tp10_hit": false,
@@ -981,7 +989,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T00:25:00+00:00"
+      "tp_last_scan_time": "2026-09-16T00:45:00+00:00"
     }
   },
   "closed_trades": [],
@@ -1346,6 +1354,10 @@
       "-1002536113120": false
     },
     "SIGNAL|NXPCUSDT|BUY|2026-09-15T20:00:00+00:00|394|0.209100000000": {
+      "1448700069": true,
+      "-1002536113120": false
+    },
+    "TP|NXPCUSDT|BUY|2026-09-15T20:00:00+00:00|394|0.209100000000|TP1": {
       "1448700069": true,
       "-1002536113120": false
     }
@@ -1843,6 +1855,10 @@
           ]
         ]
       }
+    },
+    "TP|NXPCUSDT|BUY|2026-09-15T20:00:00+00:00|394|0.209100000000|TP1": {
+      "text": "🎯 TP1 زده شد\n\n🔢 شماره معامله: #84\nنماد: NXPCUSDT\nجهت: BUY\nقیمت هدف: 0.211191\nهدف: +1%\n🛡 SL جدید: 0.2091\n\n@Cryptososhiant",
+      "reply_markup": null
     }
   }
 }
