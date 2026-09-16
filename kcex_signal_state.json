@@ -91,7 +91,7 @@
     "XVSUSDT": "2026-09-14T20:00:00+00:00",
     "VETUSDT": "2026-09-15T00:00:00+00:00",
     "MINAUSDT": "2026-09-16T00:00:00+00:00",
-    "IDUSDT": "2026-09-15T12:00:00+00:00",
+    "IDUSDT": "2026-09-16T04:00:00+00:00",
     "BIGTIMEUSDT": "2026-09-16T00:00:00+00:00",
     "FLOWUSDT": "2026-09-15T08:00:00+00:00",
     "C98USDT": "2026-09-14T20:00:00+00:00",
@@ -101,7 +101,7 @@
     "ETCUSDT": "2026-09-15T00:00:00+00:00",
     "ANIMEUSDT": "2026-09-14T00:00:00+00:00",
     "AVAUSDT": "2026-09-15T08:00:00+00:00",
-    "NXPCUSDT": "2026-09-15T20:00:00+00:00",
+    "NXPCUSDT": "2026-09-16T04:00:00+00:00",
     "PHAUSDT": "2026-09-15T20:00:00+00:00",
     "RAYUSDT": "2026-09-15T16:00:00+00:00",
     "WCTUSDT": "2026-09-15T04:00:00+00:00",
@@ -147,7 +147,7 @@
     "CYSUSDT": "2026-09-12T16:00:00+00:00",
     "BEATUSDT": "2026-09-12T12:00:00+00:00",
     "TMXUSDT": "2026-09-14T04:00:00+00:00",
-    "BANKUSDT": "2026-09-16T00:00:00+00:00",
+    "BANKUSDT": "2026-09-16T04:00:00+00:00",
     "MOOUSDT": "2026-09-12T20:00:00+00:00",
     "AI1USDT": "2026-09-14T08:00:00+00:00",
     "ARROWUSDT": "2026-09-13T08:00:00+00:00",
@@ -164,9 +164,9 @@
     "ORCLUSDT": "2026-09-11T12:00:00+00:00",
     "STXUSDT": "2026-09-15T00:00:00+00:00",
     "BANDUSDT": "2026-09-14T20:00:00+00:00",
-    "ARKUSDT": "2026-09-15T00:00:00+00:00",
+    "ARKUSDT": "2026-09-16T04:00:00+00:00",
     "SLPUSDT": "2026-09-14T20:00:00+00:00",
-    "ZENUSDT": "2026-09-16T00:00:00+00:00",
+    "ZENUSDT": "2026-09-16T04:00:00+00:00",
     "FLUXUSDT": "2026-09-15T08:00:00+00:00",
     "PAYPUSDT": "2026-09-02T16:00:00+00:00",
     "PLAYUSDT": "2026-09-09T12:00:00+00:00",
@@ -316,7 +316,7 @@
     "XVSUSDT": "SELL|2026-09-14T20:00:00+00:00|393|3.110000000000",
     "VETUSDT": "SELL|2026-09-15T00:00:00+00:00|393|0.008130000000",
     "MINAUSDT": "SELL|2026-09-16T00:00:00+00:00|394|0.089200000000",
-    "IDUSDT": "SELL|2026-09-15T12:00:00+00:00|393|0.033900000000",
+    "IDUSDT": "BUY|2026-09-16T04:00:00+00:00|393|0.032100000000",
     "BIGTIMEUSDT": "BUY|2026-09-16T00:00:00+00:00|393|0.007020000000",
     "FLOWUSDT": "SELL|2026-09-15T08:00:00+00:00|394|0.028520000000",
     "C98USDT": "SELL|2026-09-14T20:00:00+00:00|394|0.014430000000",
@@ -326,7 +326,7 @@
     "ETCUSDT": "SELL|2026-09-15T00:00:00+00:00|393|7.670000000000",
     "ANIMEUSDT": "SELL|2026-09-14T00:00:00+00:00|390|0.003190000000",
     "AVAUSDT": "SELL|2026-09-15T08:00:00+00:00|390|0.177200000000",
-    "NXPCUSDT": "BUY|2026-09-15T20:00:00+00:00|394|0.209100000000",
+    "NXPCUSDT": "SELL|2026-09-16T04:00:00+00:00|393|0.214100000000",
     "PHAUSDT": "SELL|2026-09-15T20:00:00+00:00|393|0.028100000000",
     "RAYUSDT": "SELL|2026-09-15T16:00:00+00:00|393|1.442200000000",
     "WCTUSDT": "SELL|2026-09-15T04:00:00+00:00|393|0.037840000000",
@@ -372,7 +372,7 @@
     "CYSUSDT": "SELL|2026-09-12T16:00:00+00:00|393|0.163730000000",
     "BEATUSDT": "SELL|2026-09-12T12:00:00+00:00|394|0.096190000000",
     "TMXUSDT": "SELL|2026-09-14T04:00:00+00:00|115|0.031080000000",
-    "BANKUSDT": "BUY|2026-09-16T00:00:00+00:00|393|0.027000000000",
+    "BANKUSDT": "SELL|2026-09-16T04:00:00+00:00|393|0.027600000000",
     "MOOUSDT": "SELL|2026-09-12T20:00:00+00:00|66|0.025820000000",
     "AI1USDT": "SELL|2026-09-14T08:00:00+00:00|315|0.278597000000",
     "ARROWUSDT": "BUY|2026-09-13T08:00:00+00:00|390|0.353600000000",
@@ -389,9 +389,9 @@
     "ORCLUSDT": "BUY|2026-09-11T12:00:00+00:00|142|160.360000610352",
     "STXUSDT": "SELL|2026-09-15T00:00:00+00:00|394|0.272900000000",
     "BANDUSDT": "SELL|2026-09-14T20:00:00+00:00|394|0.198300000000",
-    "ARKUSDT": "SELL|2026-09-15T00:00:00+00:00|393|0.214300000000",
+    "ARKUSDT": "BUY|2026-09-16T04:00:00+00:00|394|0.142500000000",
     "SLPUSDT": "SELL|2026-09-14T20:00:00+00:00|394|0.000652000000",
-    "ZENUSDT": "SELL|2026-09-16T00:00:00+00:00|394|6.315000000000",
+    "ZENUSDT": "BUY|2026-09-16T04:00:00+00:00|392|6.226000000000",
     "FLUXUSDT": "SELL|2026-09-15T08:00:00+00:00|393|0.059000000000",
     "PAYPUSDT": "BUY|2026-09-02T16:00:00+00:00|130|14.935000419617",
     "PLAYUSDT": "BUY|2026-09-09T12:00:00+00:00|137|8.640000343323",
@@ -546,7 +546,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T07:55:00+00:00"
+      "tp_last_scan_time": "2026-09-16T08:15:00+00:00"
     },
     "BARDUSDT": {
       "trade_number": 80,
@@ -650,7 +650,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T07:55:00+00:00"
+      "tp_last_scan_time": "2026-09-16T08:15:00+00:00"
     },
     "ALGOUSDT": {
       "trade_number": 81,
@@ -761,7 +761,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T07:55:00+00:00"
+      "tp_last_scan_time": "2026-09-16T08:15:00+00:00"
     },
     "IDUSDT": {
       "trade_number": 82,
@@ -858,7 +858,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T07:55:00+00:00"
+      "tp_last_scan_time": "2026-09-16T08:15:00+00:00"
     },
     "KMNOUSDT": {
       "trade_number": 83,
@@ -927,7 +927,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T07:55:00+00:00"
+      "tp_last_scan_time": "2026-09-16T08:15:00+00:00"
     },
     "NXPCUSDT": {
       "trade_number": 84,
@@ -1003,7 +1003,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T07:55:00+00:00"
+      "tp_last_scan_time": "2026-09-16T08:15:00+00:00"
     },
     "BIGTIMEUSDT": {
       "trade_number": 85,
@@ -1086,7 +1086,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T07:55:00+00:00"
+      "tp_last_scan_time": "2026-09-16T08:15:00+00:00"
     },
     "CFGUSDT": {
       "trade_number": 86,
@@ -1169,7 +1169,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T07:55:00+00:00"
+      "tp_last_scan_time": "2026-09-16T08:15:00+00:00"
     },
     "JSTUSDT": {
       "trade_number": 87,
@@ -1238,7 +1238,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T07:55:00+00:00"
+      "tp_last_scan_time": "2026-09-16T08:15:00+00:00"
     },
     "EULUSDT": {
       "trade_number": 88,
@@ -1314,7 +1314,127 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T07:55:00+00:00"
+      "tp_last_scan_time": "2026-09-16T08:15:00+00:00"
+    },
+    "ZENUSDT": {
+      "trade_number": 89,
+      "symbol": "ZENUSDT",
+      "name": "ZEN",
+      "signal_id": "BUY|2026-09-16T04:00:00+00:00|392|6.226000000000",
+      "side": "BUY",
+      "initial_sl": 6.226,
+      "current_sl": 6.226,
+      "sl": 6.226,
+      "entry_price": 6.226,
+      "signal_time": "2026-09-16T04:00:00+00:00",
+      "activated_at": "2026-09-16T08:18:06.073115+00:00",
+      "margin": 10.0,
+      "notional": 100.0,
+      "leverage": 10.0,
+      "tp1_hit": false,
+      "tp2_hit": false,
+      "tp3_hit": false,
+      "tp4_hit": false,
+      "tp5_hit": false,
+      "tp6_hit": false,
+      "tp7_hit": false,
+      "tp8_hit": false,
+      "full_tp_hit": false,
+      "last_tp_hit": "",
+      "tp_hits": [],
+      "balance_at_entry": 100.0,
+      "tp9_hit": false,
+      "tp10_hit": false,
+      "tp11_hit": false,
+      "tp12_hit": false,
+      "tp13_hit": false,
+      "tp14_hit": false,
+      "tp15_hit": false,
+      "tp16_hit": false,
+      "tp17_hit": false,
+      "tp18_hit": false,
+      "tp19_hit": false,
+      "tp20_hit": false,
+      "tp21_hit": false,
+      "tp22_hit": false,
+      "tp23_hit": false,
+      "tp24_hit": false,
+      "tp25_hit": false,
+      "tp26_hit": false,
+      "tp27_hit": false,
+      "tp28_hit": false,
+      "tp29_hit": false,
+      "tp30_hit": false,
+      "tp31_hit": false,
+      "tp32_hit": false,
+      "tp33_hit": false,
+      "tp34_hit": false,
+      "tp35_hit": false,
+      "tp36_hit": false,
+      "tp37_hit": false,
+      "tp38_hit": false,
+      "tp39_hit": false,
+      "tp40_hit": false
+    },
+    "BANKUSDT": {
+      "trade_number": 90,
+      "symbol": "BANKUSDT",
+      "name": "BANK",
+      "signal_id": "SELL|2026-09-16T04:00:00+00:00|393|0.027600000000",
+      "side": "SELL",
+      "initial_sl": 0.0276,
+      "current_sl": 0.0276,
+      "sl": 0.0276,
+      "entry_price": 0.0276,
+      "signal_time": "2026-09-16T04:00:00+00:00",
+      "activated_at": "2026-09-16T08:18:07.739224+00:00",
+      "margin": 10.0,
+      "notional": 100.0,
+      "leverage": 10.0,
+      "tp1_hit": false,
+      "tp2_hit": false,
+      "tp3_hit": false,
+      "tp4_hit": false,
+      "tp5_hit": false,
+      "tp6_hit": false,
+      "tp7_hit": false,
+      "tp8_hit": false,
+      "full_tp_hit": false,
+      "last_tp_hit": "",
+      "tp_hits": [],
+      "balance_at_entry": 100.0,
+      "tp9_hit": false,
+      "tp10_hit": false,
+      "tp11_hit": false,
+      "tp12_hit": false,
+      "tp13_hit": false,
+      "tp14_hit": false,
+      "tp15_hit": false,
+      "tp16_hit": false,
+      "tp17_hit": false,
+      "tp18_hit": false,
+      "tp19_hit": false,
+      "tp20_hit": false,
+      "tp21_hit": false,
+      "tp22_hit": false,
+      "tp23_hit": false,
+      "tp24_hit": false,
+      "tp25_hit": false,
+      "tp26_hit": false,
+      "tp27_hit": false,
+      "tp28_hit": false,
+      "tp29_hit": false,
+      "tp30_hit": false,
+      "tp31_hit": false,
+      "tp32_hit": false,
+      "tp33_hit": false,
+      "tp34_hit": false,
+      "tp35_hit": false,
+      "tp36_hit": false,
+      "tp37_hit": false,
+      "tp38_hit": false,
+      "tp39_hit": false,
+      "tp40_hit": false
     }
   },
   "closed_trades": [],
@@ -1745,6 +1865,14 @@
     "TP|EULUSDT|BUY|2026-09-16T00:00:00+00:00|394|1.263000000000|TP2": {
       "1448700069": true,
       "-1002536113120": false
+    },
+    "SIGNAL|ZENUSDT|BUY|2026-09-16T04:00:00+00:00|392|6.226000000000": {
+      "1448700069": true,
+      "-1002536113120": false
+    },
+    "SIGNAL|BANKUSDT|SELL|2026-09-16T04:00:00+00:00|393|0.027600000000": {
+      "1448700069": true,
+      "-1002536113120": false
     }
   },
   "daily_stats": {
@@ -1780,14 +1908,16 @@
       "sl_signal_ids": []
     },
     "2026-09-16": {
-      "signals": 4,
+      "signals": 6,
       "tp_wins": 0,
       "sl_losses": 0,
       "signal_ids": [
         "BUY|2026-09-16T00:00:00+00:00|393|0.007020000000",
         "BUY|2026-09-16T00:00:00+00:00|394|0.101000000000",
         "BUY|2026-09-16T00:00:00+00:00|393|0.114640000000",
-        "BUY|2026-09-16T00:00:00+00:00|394|1.263000000000"
+        "BUY|2026-09-16T00:00:00+00:00|394|1.263000000000",
+        "BUY|2026-09-16T04:00:00+00:00|392|6.226000000000",
+        "SELL|2026-09-16T04:00:00+00:00|393|0.027600000000"
       ],
       "tp_signal_ids": [],
       "sl_signal_ids": []
@@ -1795,7 +1925,7 @@
   },
   "monthly_stats": {
     "2026-09": {
-      "signals": 10,
+      "signals": 12,
       "tp_wins": 0,
       "sl_losses": 0,
       "signal_ids": [
@@ -1808,7 +1938,9 @@
         "BUY|2026-09-16T00:00:00+00:00|393|0.007020000000",
         "BUY|2026-09-16T00:00:00+00:00|394|0.101000000000",
         "BUY|2026-09-16T00:00:00+00:00|393|0.114640000000",
-        "BUY|2026-09-16T00:00:00+00:00|394|1.263000000000"
+        "BUY|2026-09-16T00:00:00+00:00|394|1.263000000000",
+        "BUY|2026-09-16T04:00:00+00:00|392|6.226000000000",
+        "SELL|2026-09-16T04:00:00+00:00|393|0.027600000000"
       ],
       "tp_signal_ids": [],
       "sl_signal_ids": []
@@ -1817,7 +1949,7 @@
   "portfolio": {
     "initial_balance": 100.0,
     "balance": 100.0,
-    "next_trade_number": 89,
+    "next_trade_number": 91,
     "total_realized_pnl": 0.0,
     "period_opening_balances": {
       "DAY|2026-09-12": 100.0,
@@ -2068,7 +2200,7 @@
   },
   "weekly_stats": {
     "2026-09-14": {
-      "signals": 10,
+      "signals": 12,
       "tp_wins": 0,
       "sl_losses": 0,
       "signal_ids": [
@@ -2081,7 +2213,9 @@
         "BUY|2026-09-16T00:00:00+00:00|393|0.007020000000",
         "BUY|2026-09-16T00:00:00+00:00|394|0.101000000000",
         "BUY|2026-09-16T00:00:00+00:00|393|0.114640000000",
-        "BUY|2026-09-16T00:00:00+00:00|394|1.263000000000"
+        "BUY|2026-09-16T00:00:00+00:00|394|1.263000000000",
+        "BUY|2026-09-16T04:00:00+00:00|392|6.226000000000",
+        "SELL|2026-09-16T04:00:00+00:00|393|0.027600000000"
       ],
       "tp_signal_ids": [],
       "sl_signal_ids": []
@@ -2361,6 +2495,32 @@
     "TP|EULUSDT|BUY|2026-09-16T00:00:00+00:00|394|1.263000000000|TP2": {
       "text": "🎯 TP2 زده شد\n\n🔢 شماره معامله: #88\nنماد: EULUSDT\nجهت: BUY\nقیمت هدف: 1.28826\nهدف: +2%\n🛡 SL جدید: 1.263\n\n@Cryptososhiant",
       "reply_markup": null
+    },
+    "SIGNAL|ZENUSDT|BUY|2026-09-16T04:00:00+00:00|392|6.226000000000": {
+      "text": "🟢 سیگنال خرید\n\n🔢 شماره معامله: #89\nنماد: ZENUSDT\nنام: ZEN\nتایم‌فریم: 4H\n\n📍 ورود: 6.226\n🛑 SL اولیه: 6.226\n💵 مارجین: $10.00\n📊 ارزش پوزیشن: $100.00\n⚡ اهرم: 10x\n\n🎯 اهداف:\nTP1: 6.28826 (+1%)\nTP2: 6.35052 (+2%)\n\n💰 مارجین ثابت: $10.00\nزمان: 2026-09-16 08:18:05 UTC\n\n@Cryptososhiant",
+      "reply_markup": {
+        "inline_keyboard": [
+          [
+            {
+              "text": "🎯 TP1 — نمایش TP3 تا TP40",
+              "callback_data": "SHOW_TPS:89"
+            }
+          ]
+        ]
+      }
+    },
+    "SIGNAL|BANKUSDT|SELL|2026-09-16T04:00:00+00:00|393|0.027600000000": {
+      "text": "🔴 سیگنال فروش\n\n🔢 شماره معامله: #90\nنماد: BANKUSDT\nنام: BANK\nتایم‌فریم: 4H\n\n📍 ورود: 0.0276\n🛑 SL اولیه: 0.0276\n💵 مارجین: $10.00\n📊 ارزش پوزیشن: $100.00\n⚡ اهرم: 10x\n\n🎯 اهداف:\nTP1: 0.027324 (+1%)\nTP2: 0.027048 (+2%)\n\n💰 مارجین ثابت: $10.00\nزمان: 2026-09-16 08:18:07 UTC\n\n@Cryptososhiant",
+      "reply_markup": {
+        "inline_keyboard": [
+          [
+            {
+              "text": "🎯 TP1 — نمایش TP3 تا TP40",
+              "callback_data": "SHOW_TPS:90"
+            }
+          ]
+        ]
+      }
     }
   }
 }
