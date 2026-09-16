@@ -546,7 +546,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T20:05:00+00:00"
+      "tp_last_scan_time": "2026-09-16T20:25:00+00:00"
     },
     "BARDUSDT": {
       "trade_number": 80,
@@ -657,7 +657,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T20:05:00+00:00"
+      "tp_last_scan_time": "2026-09-16T20:25:00+00:00"
     },
     "ALGOUSDT": {
       "trade_number": 81,
@@ -768,7 +768,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T20:05:00+00:00"
+      "tp_last_scan_time": "2026-09-16T20:25:00+00:00"
     },
     "IDUSDT": {
       "trade_number": 82,
@@ -872,7 +872,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T20:05:00+00:00"
+      "tp_last_scan_time": "2026-09-16T20:25:00+00:00"
     },
     "KMNOUSDT": {
       "trade_number": 83,
@@ -948,7 +948,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T20:05:00+00:00"
+      "tp_last_scan_time": "2026-09-16T20:25:00+00:00"
     },
     "NXPCUSDT": {
       "trade_number": 84,
@@ -1024,7 +1024,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T20:05:00+00:00"
+      "tp_last_scan_time": "2026-09-16T20:25:00+00:00"
     },
     "BIGTIMEUSDT": {
       "trade_number": 85,
@@ -1107,7 +1107,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T20:05:00+00:00"
+      "tp_last_scan_time": "2026-09-16T20:25:00+00:00"
     },
     "CFGUSDT": {
       "trade_number": 86,
@@ -1190,7 +1190,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T20:05:00+00:00"
+      "tp_last_scan_time": "2026-09-16T20:25:00+00:00"
     },
     "JSTUSDT": {
       "trade_number": 87,
@@ -1259,7 +1259,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T20:05:00+00:00"
+      "tp_last_scan_time": "2026-09-16T20:25:00+00:00"
     },
     "EULUSDT": {
       "trade_number": 88,
@@ -1342,7 +1342,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T20:05:00+00:00"
+      "tp_last_scan_time": "2026-09-16T20:25:00+00:00"
     },
     "ZENUSDT": {
       "trade_number": 89,
@@ -1453,7 +1453,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T20:05:00+00:00"
+      "tp_last_scan_time": "2026-09-16T20:25:00+00:00"
     },
     "BANKUSDT": {
       "trade_number": 90,
@@ -1536,67 +1536,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T20:05:00+00:00"
-    },
-    "SUIUSDT": {
-      "trade_number": 93,
-      "symbol": "SUIUSDT",
-      "name": "SUI",
-      "signal_id": "SELL|2026-09-16T16:00:00+00:00|394|0.694100000000",
-      "side": "SELL",
-      "initial_sl": 0.6941,
-      "current_sl": 0.6941,
-      "sl": 0.6941,
-      "entry_price": 0.6941,
-      "signal_time": "2026-09-16T16:00:00+00:00",
-      "activated_at": "2026-09-16T20:09:46.958304+00:00",
-      "margin": 10.0,
-      "notional": 100.0,
-      "leverage": 10.0,
-      "tp1_hit": false,
-      "tp2_hit": false,
-      "tp3_hit": false,
-      "tp4_hit": false,
-      "tp5_hit": false,
-      "tp6_hit": false,
-      "tp7_hit": false,
-      "tp8_hit": false,
-      "full_tp_hit": false,
-      "last_tp_hit": "",
-      "tp_hits": [],
-      "balance_at_entry": 100.0,
-      "tp9_hit": false,
-      "tp10_hit": false,
-      "tp11_hit": false,
-      "tp12_hit": false,
-      "tp13_hit": false,
-      "tp14_hit": false,
-      "tp15_hit": false,
-      "tp16_hit": false,
-      "tp17_hit": false,
-      "tp18_hit": false,
-      "tp19_hit": false,
-      "tp20_hit": false,
-      "tp21_hit": false,
-      "tp22_hit": false,
-      "tp23_hit": false,
-      "tp24_hit": false,
-      "tp25_hit": false,
-      "tp26_hit": false,
-      "tp27_hit": false,
-      "tp28_hit": false,
-      "tp29_hit": false,
-      "tp30_hit": false,
-      "tp31_hit": false,
-      "tp32_hit": false,
-      "tp33_hit": false,
-      "tp34_hit": false,
-      "tp35_hit": false,
-      "tp36_hit": false,
-      "tp37_hit": false,
-      "tp38_hit": false,
-      "tp39_hit": false,
-      "tp40_hit": false
+      "tp_last_scan_time": "2026-09-16T20:25:00+00:00"
     }
   },
   "closed_trades": [
@@ -1647,6 +1587,31 @@
       "last_tp_hit": "",
       "tp_hits": [],
       "current_sl": 0.1556,
+      "initial_balance": 100.0,
+      "balance_at_entry": 100.0
+    },
+    {
+      "trade_number": 93,
+      "symbol": "SUIUSDT",
+      "name": "SUI",
+      "side": "SELL",
+      "signal_id": "SELL|2026-09-16T16:00:00+00:00|394|0.694100000000",
+      "signal_time": "2026-09-16T16:00:00+00:00",
+      "entry_price": 0.6941,
+      "exit_price": 0.6941,
+      "initial_sl": 0.6941,
+      "margin": 10.0,
+      "notional": 100.0,
+      "leverage": 10.0,
+      "pnl": 0.0,
+      "balance_before": 100.0,
+      "balance_after": 100.0,
+      "reason": "INITIAL SL",
+      "exit_time": "2026-09-16 20:27:00 UTC",
+      "candle_time": "2026-09-16T16:00:00+00:00",
+      "last_tp_hit": "",
+      "tp_hits": [],
+      "current_sl": 0.6941,
       "initial_balance": 100.0,
       "balance_at_entry": 100.0
     }
@@ -2166,6 +2131,10 @@
     "DAILY_REPORT|2026-09-16": {
       "1448700069": true,
       "-1002536113120": false
+    },
+    "STOP|SUIUSDT|SELL|2026-09-16T16:00:00+00:00|394|0.694100000000|2026-09-16T16:00:00+00:00|0.6941": {
+      "1448700069": true,
+      "-1002536113120": false
     }
   },
   "daily_stats": {
@@ -2280,6 +2249,11 @@
         "time": "2026-09-16 16:36:25 UTC",
         "balance": 100.0,
         "reason": "heartbeat"
+      },
+      {
+        "time": "2026-09-16 20:27:00 UTC",
+        "balance": 100.0,
+        "reason": "trade #93 INITIAL SL"
       }
     ]
   },
@@ -2944,6 +2918,10 @@
     },
     "DAILY_REPORT|2026-09-16": {
       "text": "📊 گزارش روزانه\n\n📅 تاریخ: 2026-09-16\n\n💰 موجودی ابتدای روز: $100.00\n💰 موجودی فعلی: $100.00\n📈 سود/ضرر روز: +$0.00\n📊 بازده روز: 0.00%\n\n📨 سیگنال‌های امروز: 9\n✅ معاملات بسته‌شده سودده: 0\n❌ معاملات بسته‌شده زیان‌ده: 0\n🏆 بهترین معامله: $+0.00\n💥 بدترین معامله: $+0.00\n📈 بیشترین موجودی ثبت‌شده: $100.00\n📉 Max Drawdown: 0.00%\n📂 معاملات باز: 13\n\n@Cryptososhiant",
+      "reply_markup": null
+    },
+    "STOP|SUIUSDT|SELL|2026-09-16T16:00:00+00:00|394|0.694100000000|2026-09-16T16:00:00+00:00|0.6941": {
+      "text": "🛑 معامله بسته شد روی SL\n\n🔢 شماره معامله: #93\nنماد: SUIUSDT\nجهت: SELL\nورود: 0.6941\nSL فعال: 0.6941\nخروج: 0.6941\nPnL: +$0.00\n\n@Cryptososhiant",
       "reply_markup": null
     }
   }
