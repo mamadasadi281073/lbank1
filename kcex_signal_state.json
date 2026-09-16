@@ -546,7 +546,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T04:15:00+00:00"
+      "tp_last_scan_time": "2026-09-16T04:30:00+00:00"
     },
     "BARDUSDT": {
       "trade_number": 80,
@@ -650,7 +650,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T04:15:00+00:00"
+      "tp_last_scan_time": "2026-09-16T04:30:00+00:00"
     },
     "ALGOUSDT": {
       "trade_number": 81,
@@ -761,7 +761,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T04:15:00+00:00"
+      "tp_last_scan_time": "2026-09-16T04:30:00+00:00"
     },
     "IDUSDT": {
       "trade_number": 82,
@@ -858,7 +858,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T04:15:00+00:00"
+      "tp_last_scan_time": "2026-09-16T04:30:00+00:00"
     },
     "KMNOUSDT": {
       "trade_number": 83,
@@ -927,7 +927,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T04:15:00+00:00"
+      "tp_last_scan_time": "2026-09-16T04:30:00+00:00"
     },
     "NXPCUSDT": {
       "trade_number": 84,
@@ -945,7 +945,7 @@
       "notional": 100.0,
       "leverage": 10.0,
       "tp1_hit": true,
-      "tp2_hit": false,
+      "tp2_hit": true,
       "tp3_hit": false,
       "tp4_hit": false,
       "tp5_hit": false,
@@ -953,13 +953,20 @@
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "TP1",
+      "last_tp_hit": "TP2",
       "tp_hits": [
         {
           "name": "TP1",
           "percent": 1.0,
           "price": 0.21119100000000002,
           "time": "2026-09-16T00:40:00+00:00",
+          "new_sl": 0.2091
+        },
+        {
+          "name": "TP2",
+          "percent": 2.0,
+          "price": 0.213282,
+          "time": "2026-09-16T04:20:00+00:00",
           "new_sl": 0.2091
         }
       ],
@@ -996,7 +1003,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T04:15:00+00:00"
+      "tp_last_scan_time": "2026-09-16T04:30:00+00:00"
     },
     "BIGTIMEUSDT": {
       "trade_number": 85,
@@ -1005,25 +1012,47 @@
       "signal_id": "BUY|2026-09-16T00:00:00+00:00|393|0.007020000000",
       "side": "BUY",
       "initial_sl": 0.00702,
-      "current_sl": 0.00702,
-      "sl": 0.00702,
+      "current_sl": 0.0070902000000000005,
+      "sl": 0.0070902000000000005,
       "entry_price": 0.00702,
       "signal_time": "2026-09-16T00:00:00+00:00",
       "activated_at": "2026-09-16T04:16:30.623406+00:00",
       "margin": 10.0,
       "notional": 100.0,
       "leverage": 10.0,
-      "tp1_hit": false,
-      "tp2_hit": false,
-      "tp3_hit": false,
+      "tp1_hit": true,
+      "tp2_hit": true,
+      "tp3_hit": true,
       "tp4_hit": false,
       "tp5_hit": false,
       "tp6_hit": false,
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "",
-      "tp_hits": [],
+      "last_tp_hit": "TP3",
+      "tp_hits": [
+        {
+          "name": "TP1",
+          "percent": 1.0,
+          "price": 0.0070902000000000005,
+          "time": "2026-09-16T04:20:00+00:00",
+          "new_sl": 0.00702
+        },
+        {
+          "name": "TP2",
+          "percent": 2.0,
+          "price": 0.0071604,
+          "time": "2026-09-16T04:20:00+00:00",
+          "new_sl": 0.00702
+        },
+        {
+          "name": "TP3",
+          "percent": 3.0,
+          "price": 0.0072306,
+          "time": "2026-09-16T04:20:00+00:00",
+          "new_sl": 0.0070902000000000005
+        }
+      ],
       "balance_at_entry": 100.0,
       "tp9_hit": false,
       "tp10_hit": false,
@@ -1056,7 +1085,8 @@
       "tp37_hit": false,
       "tp38_hit": false,
       "tp39_hit": false,
-      "tp40_hit": false
+      "tp40_hit": false,
+      "tp_last_scan_time": "2026-09-16T04:30:00+00:00"
     },
     "CFGUSDT": {
       "trade_number": 86,
@@ -1065,25 +1095,47 @@
       "signal_id": "BUY|2026-09-16T00:00:00+00:00|394|0.101000000000",
       "side": "BUY",
       "initial_sl": 0.101,
-      "current_sl": 0.101,
-      "sl": 0.101,
+      "current_sl": 0.10201,
+      "sl": 0.10201,
       "entry_price": 0.101,
       "signal_time": "2026-09-16T00:00:00+00:00",
       "activated_at": "2026-09-16T04:16:32.838726+00:00",
       "margin": 10.0,
       "notional": 100.0,
       "leverage": 10.0,
-      "tp1_hit": false,
-      "tp2_hit": false,
-      "tp3_hit": false,
+      "tp1_hit": true,
+      "tp2_hit": true,
+      "tp3_hit": true,
       "tp4_hit": false,
       "tp5_hit": false,
       "tp6_hit": false,
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "",
-      "tp_hits": [],
+      "last_tp_hit": "TP3",
+      "tp_hits": [
+        {
+          "name": "TP1",
+          "percent": 1.0,
+          "price": 0.10201,
+          "time": "2026-09-16T04:20:00+00:00",
+          "new_sl": 0.101
+        },
+        {
+          "name": "TP2",
+          "percent": 2.0,
+          "price": 0.10302000000000001,
+          "time": "2026-09-16T04:20:00+00:00",
+          "new_sl": 0.101
+        },
+        {
+          "name": "TP3",
+          "percent": 3.0,
+          "price": 0.10403000000000001,
+          "time": "2026-09-16T04:20:00+00:00",
+          "new_sl": 0.10201
+        }
+      ],
       "balance_at_entry": 100.0,
       "tp9_hit": false,
       "tp10_hit": false,
@@ -1116,7 +1168,8 @@
       "tp37_hit": false,
       "tp38_hit": false,
       "tp39_hit": false,
-      "tp40_hit": false
+      "tp40_hit": false,
+      "tp_last_scan_time": "2026-09-16T04:30:00+00:00"
     },
     "JSTUSDT": {
       "trade_number": 87,
@@ -1133,7 +1186,7 @@
       "margin": 10.0,
       "notional": 100.0,
       "leverage": 10.0,
-      "tp1_hit": false,
+      "tp1_hit": true,
       "tp2_hit": false,
       "tp3_hit": false,
       "tp4_hit": false,
@@ -1142,8 +1195,16 @@
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "",
-      "tp_hits": [],
+      "last_tp_hit": "TP1",
+      "tp_hits": [
+        {
+          "name": "TP1",
+          "percent": 1.0,
+          "price": 0.11578640000000001,
+          "time": "2026-09-16T04:20:00+00:00",
+          "new_sl": 0.11464
+        }
+      ],
       "balance_at_entry": 100.0,
       "tp9_hit": false,
       "tp10_hit": false,
@@ -1176,7 +1237,8 @@
       "tp37_hit": false,
       "tp38_hit": false,
       "tp39_hit": false,
-      "tp40_hit": false
+      "tp40_hit": false,
+      "tp_last_scan_time": "2026-09-16T04:30:00+00:00"
     },
     "EULUSDT": {
       "trade_number": 88,
@@ -1193,7 +1255,7 @@
       "margin": 10.0,
       "notional": 100.0,
       "leverage": 10.0,
-      "tp1_hit": false,
+      "tp1_hit": true,
       "tp2_hit": false,
       "tp3_hit": false,
       "tp4_hit": false,
@@ -1202,8 +1264,16 @@
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "",
-      "tp_hits": [],
+      "last_tp_hit": "TP1",
+      "tp_hits": [
+        {
+          "name": "TP1",
+          "percent": 1.0,
+          "price": 1.2756299999999998,
+          "time": "2026-09-16T04:25:00+00:00",
+          "new_sl": 1.263
+        }
+      ],
       "balance_at_entry": 100.0,
       "tp9_hit": false,
       "tp10_hit": false,
@@ -1236,7 +1306,8 @@
       "tp37_hit": false,
       "tp38_hit": false,
       "tp39_hit": false,
-      "tp40_hit": false
+      "tp40_hit": false,
+      "tp_last_scan_time": "2026-09-16T04:30:00+00:00"
     }
   },
   "closed_trades": [],
@@ -1625,6 +1696,42 @@
       "-1002536113120": false
     },
     "SIGNAL|EULUSDT|BUY|2026-09-16T00:00:00+00:00|394|1.263000000000": {
+      "1448700069": true,
+      "-1002536113120": false
+    },
+    "TP|NXPCUSDT|BUY|2026-09-15T20:00:00+00:00|394|0.209100000000|TP2": {
+      "1448700069": true,
+      "-1002536113120": false
+    },
+    "TP|BIGTIMEUSDT|BUY|2026-09-16T00:00:00+00:00|393|0.007020000000|TP1": {
+      "1448700069": true,
+      "-1002536113120": false
+    },
+    "TP|BIGTIMEUSDT|BUY|2026-09-16T00:00:00+00:00|393|0.007020000000|TP2": {
+      "1448700069": true,
+      "-1002536113120": false
+    },
+    "TP|BIGTIMEUSDT|BUY|2026-09-16T00:00:00+00:00|393|0.007020000000|TP3": {
+      "1448700069": true,
+      "-1002536113120": false
+    },
+    "TP|CFGUSDT|BUY|2026-09-16T00:00:00+00:00|394|0.101000000000|TP1": {
+      "1448700069": true,
+      "-1002536113120": false
+    },
+    "TP|CFGUSDT|BUY|2026-09-16T00:00:00+00:00|394|0.101000000000|TP2": {
+      "1448700069": true,
+      "-1002536113120": false
+    },
+    "TP|CFGUSDT|BUY|2026-09-16T00:00:00+00:00|394|0.101000000000|TP3": {
+      "1448700069": true,
+      "-1002536113120": false
+    },
+    "TP|JSTUSDT|BUY|2026-09-16T00:00:00+00:00|393|0.114640000000|TP1": {
+      "1448700069": true,
+      "-1002536113120": false
+    },
+    "TP|EULUSDT|BUY|2026-09-16T00:00:00+00:00|394|1.263000000000|TP1": {
       "1448700069": true,
       "-1002536113120": false
     }
@@ -2203,6 +2310,42 @@
           ]
         ]
       }
+    },
+    "TP|NXPCUSDT|BUY|2026-09-15T20:00:00+00:00|394|0.209100000000|TP2": {
+      "text": "🎯 TP2 زده شد\n\n🔢 شماره معامله: #84\nنماد: NXPCUSDT\nجهت: BUY\nقیمت هدف: 0.213282\nهدف: +2%\n🛡 SL جدید: 0.2091\n\n@Cryptososhiant",
+      "reply_markup": null
+    },
+    "TP|BIGTIMEUSDT|BUY|2026-09-16T00:00:00+00:00|393|0.007020000000|TP1": {
+      "text": "🎯 TP1 زده شد\n\n🔢 شماره معامله: #85\nنماد: BIGTIMEUSDT\nجهت: BUY\nقیمت هدف: 0.0070902\nهدف: +1%\n🛡 SL جدید: 0.00702\n\n@Cryptososhiant",
+      "reply_markup": null
+    },
+    "TP|BIGTIMEUSDT|BUY|2026-09-16T00:00:00+00:00|393|0.007020000000|TP2": {
+      "text": "🎯 TP2 زده شد\n\n🔢 شماره معامله: #85\nنماد: BIGTIMEUSDT\nجهت: BUY\nقیمت هدف: 0.0071604\nهدف: +2%\n🛡 SL جدید: 0.00702\n\n@Cryptososhiant",
+      "reply_markup": null
+    },
+    "TP|BIGTIMEUSDT|BUY|2026-09-16T00:00:00+00:00|393|0.007020000000|TP3": {
+      "text": "🎯 TP3 زده شد\n\n🔢 شماره معامله: #85\nنماد: BIGTIMEUSDT\nجهت: BUY\nقیمت هدف: 0.0072306\nهدف: +3%\n🛡 SL جدید: 0.0070902\n\n@Cryptososhiant",
+      "reply_markup": null
+    },
+    "TP|CFGUSDT|BUY|2026-09-16T00:00:00+00:00|394|0.101000000000|TP1": {
+      "text": "🎯 TP1 زده شد\n\n🔢 شماره معامله: #86\nنماد: CFGUSDT\nجهت: BUY\nقیمت هدف: 0.10201\nهدف: +1%\n🛡 SL جدید: 0.101\n\n@Cryptososhiant",
+      "reply_markup": null
+    },
+    "TP|CFGUSDT|BUY|2026-09-16T00:00:00+00:00|394|0.101000000000|TP2": {
+      "text": "🎯 TP2 زده شد\n\n🔢 شماره معامله: #86\nنماد: CFGUSDT\nجهت: BUY\nقیمت هدف: 0.10302\nهدف: +2%\n🛡 SL جدید: 0.101\n\n@Cryptososhiant",
+      "reply_markup": null
+    },
+    "TP|CFGUSDT|BUY|2026-09-16T00:00:00+00:00|394|0.101000000000|TP3": {
+      "text": "🎯 TP3 زده شد\n\n🔢 شماره معامله: #86\nنماد: CFGUSDT\nجهت: BUY\nقیمت هدف: 0.10403\nهدف: +3%\n🛡 SL جدید: 0.10201\n\n@Cryptososhiant",
+      "reply_markup": null
+    },
+    "TP|JSTUSDT|BUY|2026-09-16T00:00:00+00:00|393|0.114640000000|TP1": {
+      "text": "🎯 TP1 زده شد\n\n🔢 شماره معامله: #87\nنماد: JSTUSDT\nجهت: BUY\nقیمت هدف: 0.1157864\nهدف: +1%\n🛡 SL جدید: 0.11464\n\n@Cryptososhiant",
+      "reply_markup": null
+    },
+    "TP|EULUSDT|BUY|2026-09-16T00:00:00+00:00|394|1.263000000000|TP1": {
+      "text": "🎯 TP1 زده شد\n\n🔢 شماره معامله: #88\nنماد: EULUSDT\nجهت: BUY\nقیمت هدف: 1.27563\nهدف: +1%\n🛡 SL جدید: 1.263\n\n@Cryptososhiant",
+      "reply_markup": null
     }
   }
 }
