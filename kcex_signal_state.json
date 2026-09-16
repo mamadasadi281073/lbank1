@@ -546,7 +546,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T04:55:00+00:00"
+      "tp_last_scan_time": "2026-09-16T05:15:00+00:00"
     },
     "BARDUSDT": {
       "trade_number": 80,
@@ -650,7 +650,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T04:55:00+00:00"
+      "tp_last_scan_time": "2026-09-16T05:15:00+00:00"
     },
     "ALGOUSDT": {
       "trade_number": 81,
@@ -761,7 +761,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T04:55:00+00:00"
+      "tp_last_scan_time": "2026-09-16T05:15:00+00:00"
     },
     "IDUSDT": {
       "trade_number": 82,
@@ -858,7 +858,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T04:55:00+00:00"
+      "tp_last_scan_time": "2026-09-16T05:15:00+00:00"
     },
     "KMNOUSDT": {
       "trade_number": 83,
@@ -927,7 +927,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T04:55:00+00:00"
+      "tp_last_scan_time": "2026-09-16T05:15:00+00:00"
     },
     "NXPCUSDT": {
       "trade_number": 84,
@@ -1003,7 +1003,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T04:55:00+00:00"
+      "tp_last_scan_time": "2026-09-16T05:15:00+00:00"
     },
     "BIGTIMEUSDT": {
       "trade_number": 85,
@@ -1086,7 +1086,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T04:55:00+00:00"
+      "tp_last_scan_time": "2026-09-16T05:15:00+00:00"
     },
     "CFGUSDT": {
       "trade_number": 86,
@@ -1169,7 +1169,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T04:55:00+00:00"
+      "tp_last_scan_time": "2026-09-16T05:15:00+00:00"
     },
     "JSTUSDT": {
       "trade_number": 87,
@@ -1238,7 +1238,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T04:55:00+00:00"
+      "tp_last_scan_time": "2026-09-16T05:15:00+00:00"
     },
     "EULUSDT": {
       "trade_number": 88,
@@ -1256,7 +1256,7 @@
       "notional": 100.0,
       "leverage": 10.0,
       "tp1_hit": true,
-      "tp2_hit": false,
+      "tp2_hit": true,
       "tp3_hit": false,
       "tp4_hit": false,
       "tp5_hit": false,
@@ -1264,13 +1264,20 @@
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "TP1",
+      "last_tp_hit": "TP2",
       "tp_hits": [
         {
           "name": "TP1",
           "percent": 1.0,
           "price": 1.2756299999999998,
           "time": "2026-09-16T04:25:00+00:00",
+          "new_sl": 1.263
+        },
+        {
+          "name": "TP2",
+          "percent": 2.0,
+          "price": 1.28826,
+          "time": "2026-09-16T05:10:00+00:00",
           "new_sl": 1.263
         }
       ],
@@ -1307,7 +1314,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T04:55:00+00:00"
+      "tp_last_scan_time": "2026-09-16T05:15:00+00:00"
     }
   },
   "closed_trades": [],
@@ -1732,6 +1739,10 @@
       "-1002536113120": false
     },
     "TP|EULUSDT|BUY|2026-09-16T00:00:00+00:00|394|1.263000000000|TP1": {
+      "1448700069": true,
+      "-1002536113120": false
+    },
+    "TP|EULUSDT|BUY|2026-09-16T00:00:00+00:00|394|1.263000000000|TP2": {
       "1448700069": true,
       "-1002536113120": false
     }
@@ -2345,6 +2356,10 @@
     },
     "TP|EULUSDT|BUY|2026-09-16T00:00:00+00:00|394|1.263000000000|TP1": {
       "text": "🎯 TP1 زده شد\n\n🔢 شماره معامله: #88\nنماد: EULUSDT\nجهت: BUY\nقیمت هدف: 1.27563\nهدف: +1%\n🛡 SL جدید: 1.263\n\n@Cryptososhiant",
+      "reply_markup": null
+    },
+    "TP|EULUSDT|BUY|2026-09-16T00:00:00+00:00|394|1.263000000000|TP2": {
+      "text": "🎯 TP2 زده شد\n\n🔢 شماره معامله: #88\nنماد: EULUSDT\nجهت: BUY\nقیمت هدف: 1.28826\nهدف: +2%\n🛡 SL جدید: 1.263\n\n@Cryptososhiant",
       "reply_markup": null
     }
   }
