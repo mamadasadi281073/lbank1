@@ -546,7 +546,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T23:40:00+00:00"
+      "tp_last_scan_time": "2026-09-16T23:50:00+00:00"
     },
     "BARDUSDT": {
       "trade_number": 80,
@@ -657,7 +657,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T23:40:00+00:00"
+      "tp_last_scan_time": "2026-09-16T23:50:00+00:00"
     },
     "ALGOUSDT": {
       "trade_number": 81,
@@ -768,7 +768,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T23:40:00+00:00"
+      "tp_last_scan_time": "2026-09-16T23:50:00+00:00"
     },
     "IDUSDT": {
       "trade_number": 82,
@@ -872,7 +872,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T23:40:00+00:00"
+      "tp_last_scan_time": "2026-09-16T23:50:00+00:00"
     },
     "KMNOUSDT": {
       "trade_number": 83,
@@ -962,7 +962,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T23:40:00+00:00"
+      "tp_last_scan_time": "2026-09-16T23:50:00+00:00"
     },
     "NXPCUSDT": {
       "trade_number": 84,
@@ -1038,7 +1038,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T23:40:00+00:00"
+      "tp_last_scan_time": "2026-09-16T23:50:00+00:00"
     },
     "BIGTIMEUSDT": {
       "trade_number": 85,
@@ -1121,7 +1121,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T23:40:00+00:00"
+      "tp_last_scan_time": "2026-09-16T23:50:00+00:00"
     },
     "CFGUSDT": {
       "trade_number": 86,
@@ -1218,7 +1218,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T23:40:00+00:00"
+      "tp_last_scan_time": "2026-09-16T23:50:00+00:00"
     },
     "JSTUSDT": {
       "trade_number": 87,
@@ -1294,7 +1294,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T23:40:00+00:00"
+      "tp_last_scan_time": "2026-09-16T23:50:00+00:00"
     },
     "EULUSDT": {
       "trade_number": 88,
@@ -1377,7 +1377,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T23:40:00+00:00"
+      "tp_last_scan_time": "2026-09-16T23:50:00+00:00"
     },
     "ZENUSDT": {
       "trade_number": 89,
@@ -1488,7 +1488,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T23:40:00+00:00"
+      "tp_last_scan_time": "2026-09-16T23:50:00+00:00"
     },
     "BANKUSDT": {
       "trade_number": 90,
@@ -1571,7 +1571,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T23:40:00+00:00"
+      "tp_last_scan_time": "2026-09-16T23:50:00+00:00"
     }
   },
   "closed_trades": [
