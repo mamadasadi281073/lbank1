@@ -546,7 +546,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T08:15:00+00:00"
+      "tp_last_scan_time": "2026-09-16T08:35:00+00:00"
     },
     "BARDUSDT": {
       "trade_number": 80,
@@ -650,7 +650,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T08:15:00+00:00"
+      "tp_last_scan_time": "2026-09-16T08:35:00+00:00"
     },
     "ALGOUSDT": {
       "trade_number": 81,
@@ -761,7 +761,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T08:15:00+00:00"
+      "tp_last_scan_time": "2026-09-16T08:35:00+00:00"
     },
     "IDUSDT": {
       "trade_number": 82,
@@ -858,7 +858,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T08:15:00+00:00"
+      "tp_last_scan_time": "2026-09-16T08:35:00+00:00"
     },
     "KMNOUSDT": {
       "trade_number": 83,
@@ -927,7 +927,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T08:15:00+00:00"
+      "tp_last_scan_time": "2026-09-16T08:35:00+00:00"
     },
     "NXPCUSDT": {
       "trade_number": 84,
@@ -1003,7 +1003,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T08:15:00+00:00"
+      "tp_last_scan_time": "2026-09-16T08:35:00+00:00"
     },
     "BIGTIMEUSDT": {
       "trade_number": 85,
@@ -1086,7 +1086,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T08:15:00+00:00"
+      "tp_last_scan_time": "2026-09-16T08:35:00+00:00"
     },
     "CFGUSDT": {
       "trade_number": 86,
@@ -1169,7 +1169,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T08:15:00+00:00"
+      "tp_last_scan_time": "2026-09-16T08:35:00+00:00"
     },
     "JSTUSDT": {
       "trade_number": 87,
@@ -1238,7 +1238,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T08:15:00+00:00"
+      "tp_last_scan_time": "2026-09-16T08:35:00+00:00"
     },
     "EULUSDT": {
       "trade_number": 88,
@@ -1314,7 +1314,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T08:15:00+00:00"
+      "tp_last_scan_time": "2026-09-16T08:35:00+00:00"
     },
     "ZENUSDT": {
       "trade_number": 89,
@@ -1331,7 +1331,7 @@
       "margin": 10.0,
       "notional": 100.0,
       "leverage": 10.0,
-      "tp1_hit": false,
+      "tp1_hit": true,
       "tp2_hit": false,
       "tp3_hit": false,
       "tp4_hit": false,
@@ -1340,8 +1340,16 @@
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "",
-      "tp_hits": [],
+      "last_tp_hit": "TP1",
+      "tp_hits": [
+        {
+          "name": "TP1",
+          "percent": 1.0,
+          "price": 6.28826,
+          "time": "2026-09-16T08:30:00+00:00",
+          "new_sl": 6.226
+        }
+      ],
       "balance_at_entry": 100.0,
       "tp9_hit": false,
       "tp10_hit": false,
@@ -1374,7 +1382,8 @@
       "tp37_hit": false,
       "tp38_hit": false,
       "tp39_hit": false,
-      "tp40_hit": false
+      "tp40_hit": false,
+      "tp_last_scan_time": "2026-09-16T08:35:00+00:00"
     },
     "BANKUSDT": {
       "trade_number": 90,
@@ -1383,25 +1392,47 @@
       "signal_id": "SELL|2026-09-16T04:00:00+00:00|393|0.027600000000",
       "side": "SELL",
       "initial_sl": 0.0276,
-      "current_sl": 0.0276,
-      "sl": 0.0276,
+      "current_sl": 0.027323999999999998,
+      "sl": 0.027323999999999998,
       "entry_price": 0.0276,
       "signal_time": "2026-09-16T04:00:00+00:00",
       "activated_at": "2026-09-16T08:18:07.739224+00:00",
       "margin": 10.0,
       "notional": 100.0,
       "leverage": 10.0,
-      "tp1_hit": false,
-      "tp2_hit": false,
-      "tp3_hit": false,
+      "tp1_hit": true,
+      "tp2_hit": true,
+      "tp3_hit": true,
       "tp4_hit": false,
       "tp5_hit": false,
       "tp6_hit": false,
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "",
-      "tp_hits": [],
+      "last_tp_hit": "TP3",
+      "tp_hits": [
+        {
+          "name": "TP1",
+          "percent": 1.0,
+          "price": 0.027323999999999998,
+          "time": "2026-09-16T08:20:00+00:00",
+          "new_sl": 0.0276
+        },
+        {
+          "name": "TP2",
+          "percent": 2.0,
+          "price": 0.027048,
+          "time": "2026-09-16T08:20:00+00:00",
+          "new_sl": 0.0276
+        },
+        {
+          "name": "TP3",
+          "percent": 3.0,
+          "price": 0.026771999999999997,
+          "time": "2026-09-16T08:30:00+00:00",
+          "new_sl": 0.027323999999999998
+        }
+      ],
       "balance_at_entry": 100.0,
       "tp9_hit": false,
       "tp10_hit": false,
@@ -1434,7 +1465,8 @@
       "tp37_hit": false,
       "tp38_hit": false,
       "tp39_hit": false,
-      "tp40_hit": false
+      "tp40_hit": false,
+      "tp_last_scan_time": "2026-09-16T08:35:00+00:00"
     }
   },
   "closed_trades": [],
@@ -1871,6 +1903,22 @@
       "-1002536113120": false
     },
     "SIGNAL|BANKUSDT|SELL|2026-09-16T04:00:00+00:00|393|0.027600000000": {
+      "1448700069": true,
+      "-1002536113120": false
+    },
+    "TP|ZENUSDT|BUY|2026-09-16T04:00:00+00:00|392|6.226000000000|TP1": {
+      "1448700069": true,
+      "-1002536113120": false
+    },
+    "TP|BANKUSDT|SELL|2026-09-16T04:00:00+00:00|393|0.027600000000|TP1": {
+      "1448700069": true,
+      "-1002536113120": false
+    },
+    "TP|BANKUSDT|SELL|2026-09-16T04:00:00+00:00|393|0.027600000000|TP2": {
+      "1448700069": true,
+      "-1002536113120": false
+    },
+    "TP|BANKUSDT|SELL|2026-09-16T04:00:00+00:00|393|0.027600000000|TP3": {
       "1448700069": true,
       "-1002536113120": false
     }
@@ -2521,6 +2569,22 @@
           ]
         ]
       }
+    },
+    "TP|ZENUSDT|BUY|2026-09-16T04:00:00+00:00|392|6.226000000000|TP1": {
+      "text": "🎯 TP1 زده شد\n\n🔢 شماره معامله: #89\nنماد: ZENUSDT\nجهت: BUY\nقیمت هدف: 6.28826\nهدف: +1%\n🛡 SL جدید: 6.226\n\n@Cryptososhiant",
+      "reply_markup": null
+    },
+    "TP|BANKUSDT|SELL|2026-09-16T04:00:00+00:00|393|0.027600000000|TP1": {
+      "text": "🎯 TP1 زده شد\n\n🔢 شماره معامله: #90\nنماد: BANKUSDT\nجهت: SELL\nقیمت هدف: 0.027324\nهدف: +1%\n🛡 SL جدید: 0.0276\n\n@Cryptososhiant",
+      "reply_markup": null
+    },
+    "TP|BANKUSDT|SELL|2026-09-16T04:00:00+00:00|393|0.027600000000|TP2": {
+      "text": "🎯 TP2 زده شد\n\n🔢 شماره معامله: #90\nنماد: BANKUSDT\nجهت: SELL\nقیمت هدف: 0.027048\nهدف: +2%\n🛡 SL جدید: 0.0276\n\n@Cryptososhiant",
+      "reply_markup": null
+    },
+    "TP|BANKUSDT|SELL|2026-09-16T04:00:00+00:00|393|0.027600000000|TP3": {
+      "text": "🎯 TP3 زده شد\n\n🔢 شماره معامله: #90\nنماد: BANKUSDT\nجهت: SELL\nقیمت هدف: 0.026772\nهدف: +3%\n🛡 SL جدید: 0.027324\n\n@Cryptososhiant",
+      "reply_markup": null
     }
   }
 }
