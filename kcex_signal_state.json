@@ -546,7 +546,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T01:15:00+00:00"
+      "tp_last_scan_time": "2026-09-16T01:30:00+00:00"
     },
     "BARDUSDT": {
       "trade_number": 80,
@@ -643,7 +643,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T01:15:00+00:00"
+      "tp_last_scan_time": "2026-09-16T01:30:00+00:00"
     },
     "ALGOUSDT": {
       "trade_number": 81,
@@ -754,7 +754,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T01:15:00+00:00"
+      "tp_last_scan_time": "2026-09-16T01:30:00+00:00"
     },
     "IDUSDT": {
       "trade_number": 82,
@@ -851,7 +851,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T01:15:00+00:00"
+      "tp_last_scan_time": "2026-09-16T01:30:00+00:00"
     },
     "KMNOUSDT": {
       "trade_number": 83,
@@ -920,7 +920,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T01:15:00+00:00"
+      "tp_last_scan_time": "2026-09-16T01:30:00+00:00"
     },
     "NXPCUSDT": {
       "trade_number": 84,
@@ -989,7 +989,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-16T01:15:00+00:00"
+      "tp_last_scan_time": "2026-09-16T01:30:00+00:00"
     }
   },
   "closed_trades": [],
