@@ -1,7 +1,6 @@
 import os
 import re
 import json
-import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 
@@ -27,7 +26,6 @@ BINANCE_SPOT_BASE = os.getenv(
     "BINANCE_SPOT_BASE",
     "https://data-api.binance.vision",
 ).rstrip("/")
-
 
 BINANCE_TIMEOUT = int(os.getenv("BINANCE_TIMEOUT", "15"))
 BINANCE_4H_BARS = int(os.getenv("BINANCE_4H_BARS", "400"))
@@ -60,6 +58,9 @@ TP8_PERCENT = 20.0
 STARTING_BALANCE = 200.0
 FIXED_MARGIN = 10.0
 LEVERAGE = 10.0
+# Fixed exchange fee charged once when a position is closed.
+# It is deducted on both TP40 (full TP) and SL closes.
+CLOSE_TRADE_FEE = 1.0
 
 # Maximum allowed distance between the signal event close and the
 # selected Order Block boundary. Kept identical to the original filter.
@@ -212,12 +213,6 @@ def load_state():
         "deliveries",
         {},
     )
-    # Messages that reached at least one Telegram target but failed on another
-    # target are kept here and retried on the next GitHub Actions run.
-    state.setdefault(
-        "pending_messages",
-        {},
-    )
 
     state.setdefault(
         "daily_stats",
@@ -250,6 +245,7 @@ def load_state():
     portfolio.setdefault("balance", STARTING_BALANCE)
     portfolio.setdefault("next_trade_number", 1)
     portfolio.setdefault("total_realized_pnl", 0.0)
+    portfolio.setdefault("total_fees", 0.0)
     portfolio.setdefault("period_opening_balances", {})
     portfolio.setdefault("equity_curve", [])
     state.setdefault("telegram_update_offset", 0)
@@ -451,7 +447,7 @@ def get_monthly_stats(
 
 def get_week_start(dt):
     # هفته از دوشنبه شروع می‌شود.
-    monday = dt - pd.Timedelta(days=int(dt.weekday()), unit="D")
+    monday = dt - pd.Timedelta(days=int(dt.weekday()))
     return monday.strftime("%Y-%m-%d")
 
 
@@ -913,12 +909,6 @@ def normalize_requested_symbol(value):
 
 
 def read_source_symbols():
-    """Read ONLY the symbols supplied by the user in coins.txt.
-
-    Binance is used only as the live market-data source. The scanner does
-    not expand the user's list to all Binance symbols and does not fall back
-    to another exchange.
-    """
     path = COINS_FILE
     if os.path.exists(path):
         rows = []
@@ -932,10 +922,7 @@ def read_source_symbols():
             print(f"Binance source file: {path} ({len(rows)} requested symbols)")
             return rows
 
-    print(
-        f"{path} was not found or empty; using embedded fallback list "
-        f"({len(FALLBACK_SOURCE_SYMBOLS)} symbols)."
-    )
+    print(f"{path} was not found or empty; using embedded fallback list ({len(FALLBACK_SOURCE_SYMBOLS)} symbols).")
     return list(FALLBACK_SOURCE_SYMBOLS)
 
 
@@ -968,59 +955,45 @@ def binance_json_get(path, params=None):
 
 
 def get_binance_spot_symbols():
-    """Resolve ONLY the requested symbols against Binance Spot USDT.
-
-    Binance supplies the live symbol metadata and candles; no API key is used.
-    Missing requested symbols are skipped rather than replaced by another
-    exchange.
-    """
+    """Resolve requested coins against Binance Spot USDT markets."""
     requested = read_source_symbols()
-
-    payload = binance_json_get("/api/v3/exchangeInfo")
-    symbols = payload.get("symbols", []) if isinstance(payload, dict) else []
-
     requested_bases = []
     seen = set()
+
     for item in requested:
         base = normalize_requested_symbol(item)
         if base and base not in seen:
             seen.add(base)
             requested_bases.append(base)
 
-    rows = []
+    payload = binance_json_get("/api/v3/exchangeInfo")
+    symbols = payload.get("symbols", []) if isinstance(payload, dict) else []
+
     symbol_map = {}
     for item in symbols:
         if not isinstance(item, dict):
             continue
-        if str(item.get("status") or "").upper() != "TRADING":
+        if item.get("status") != "TRADING":
             continue
-        if str(item.get("quoteAsset") or "").upper() != "USDT":
+        if item.get("quoteAsset") != "USDT":
             continue
         symbol = str(item.get("symbol") or "").upper()
         base = str(item.get("baseAsset") or "").upper()
-        if not symbol or not base:
-            continue
-        symbol_map.setdefault(base, item)
+        if symbol and base:
+            symbol_map.setdefault(base, item)
 
-    missing = [base for base in requested_bases if base not in symbol_map]
-    print(f"Binance requested symbols : {len(requested_bases)}")
-    print(f"Binance Spot matched      : {len(requested_bases) - len(missing)}")
-    print(f"Binance Spot missing      : {len(missing)}")
-    if missing:
-        print("Unavailable on Binance Spot:", ", ".join(missing))
-
-    order = {base: i for i, base in enumerate(requested_bases)}
+    rows = []
+    missing = []
     for base in requested_bases:
         item = symbol_map.get(base)
         if not item:
+            missing.append(base)
             continue
         rows.append({
             "symbol": item["symbol"],
             "name": base,
             "source_symbol": base + "USDT",
             "spot_symbol": item["symbol"],
-            "futures_symbol": None,
-            "market_source": "SPOT",
             "base_currency": base,
             "clear_currency": "USDT",
             "price_tick": next((x.get("tickSize") for x in item.get("filters", []) if x.get("filterType") == "PRICE_FILTER"), None),
@@ -1030,10 +1003,17 @@ def get_binance_spot_symbols():
             "default_leverage": None,
         })
 
+    order = {base: i for i, base in enumerate(requested_bases)}
     rows.sort(key=lambda row: order.get(normalize_requested_symbol(row["source_symbol"]), 999999))
-    print(f"Binance Spot matched      : {len(rows)}")
+
+    print(f"Binance requested symbols : {len(requested_bases)}")
+    print(f"Binance Spot matched   : {len(rows)}")
+    print(f"Binance Spot missing   : {len(missing)}")
+    if missing:
+        print("Not listed on Binance Spot: " + ", ".join(missing))
+
     if not rows:
-        raise RuntimeError("No Binance Spot USDT symbols are available.")
+        raise RuntimeError("None of the requested coins are currently available on Binance Spot.")
     return rows
 
 
@@ -1041,15 +1021,10 @@ def get_binance_spot_symbols():
 # BINANCE KLINE DATA
 # =========================================================
 
-def _binance_kline(symbol, size, interval, market_source="SPOT", keep_forming=False):
-    """Fetch live Binance Spot candles from the public no-auth endpoint.
-
-    The response includes the currently forming candle. Signal/SL logic uses
-    completed candles, while TP monitoring intentionally keeps the live candle.
-    """
+def _binance_kline(symbol, size, interval):
     requested_size = min(int(size), 1500)
     try:
-        payload_rows = binance_json_get(
+        payload = binance_json_get(
             "/api/v3/klines",
             {
                 "symbol": symbol,
@@ -1057,11 +1032,11 @@ def _binance_kline(symbol, size, interval, market_source="SPOT", keep_forming=Fa
                 "limit": requested_size,
             },
         )
-        if not isinstance(payload_rows, list) or not payload_rows:
+        if not isinstance(payload, list) or not payload:
             raise RuntimeError(f"Empty Kline response for {symbol} {interval}")
 
         rows = []
-        for item in payload_rows:
+        for item in payload:
             if not isinstance(item, (list, tuple)) or len(item) < 6:
                 continue
             try:
@@ -1086,9 +1061,9 @@ def _binance_kline(symbol, size, interval, market_source="SPOT", keep_forming=Fa
         )
         df = df[["Open", "High", "Low", "Close"]].dropna().copy()
 
-        if not keep_forming and len(df) > 1:
+        # Ignore the currently forming candle.
+        if len(df) > 1:
             df = df.iloc[:-1].copy()
-
         return df
     except Exception as error:
         print(f"Binance Kline request failed: {symbol} {interval}: {error}")
@@ -1108,26 +1083,12 @@ def _cached_download(key, loader):
     return value
 
 
-def download_4h_bundle(symbol, market_source="SPOT"):
-    """One live request -> completed candles for signals/SL + live candle for TP."""
-    df_live = _binance_kline(symbol, BINANCE_4H_BARS, "4h", "SPOT", keep_forming=True)
-    if df_live is None or len(df_live) < 3:
-        return None, None
-    completed = df_live.iloc[:-1].copy()
-    return completed, df_live
-
-def download_4h(symbol, market_source="SPOT"):
-    source = str(market_source or "SPOT").upper()
-    return _cached_download(("4h", source, symbol), lambda: _binance_kline(symbol, BINANCE_4H_BARS, "4h", source, keep_forming=False))
-
-def download_4h_monitor(symbol, market_source="SPOT"):
-    source = str(market_source or "SPOT").upper()
-    return _binance_kline(symbol, max(50, min(BINANCE_4H_BARS, 300)), "4h", source, keep_forming=True)
+def download_4h(symbol):
+    return _cached_download(("4h", symbol), lambda: _binance_kline(symbol, BINANCE_4H_BARS, "4h"))
 
 
-def download_1d(symbol, market_source="SPOT"):
-    source = str(market_source or "SPOT").upper()
-    return _cached_download(("1d", source, symbol), lambda: _binance_kline(symbol, BINANCE_1D_BARS, "1d", source, keep_forming=False))
+def download_1d(symbol):
+    return _cached_download(("1d", symbol), lambda: _binance_kline(symbol, BINANCE_1D_BARS, "1d"))
 
 
 def latest_daily_order(df):
@@ -1452,91 +1413,88 @@ def send_telegram_to_target(
         timeout=30,
     )
 
-    try:
-        data = response.json()
-    except Exception:
-        data = {"ok": False, "raw": response.text}
+    response.raise_for_status()
 
-    if not response.ok or not data.get("ok"):
-        raise RuntimeError(f"Telegram HTTP {response.status_code}: {data}")
+    data = response.json()
+
+    if not data.get("ok"):
+
+        raise RuntimeError(
+            str(data)
+        )
 
     return True
 
 
-def deliver_once(state, delivery_key, text, reply_markup=None):
-    """Deliver once per Telegram target without allowing one bad target to
-    block TP/SL state. Failed targets are persisted and retried later."""
+def deliver_once(
+    state,
+    delivery_key,
+    text,
+    reply_markup=None,
+):
+
     targets = telegram_targets()
+
     if not targets:
-        print("No Telegram targets configured.")
+
+        print(
+            "No Telegram targets configured."
+        )
+
         return False
 
-    delivery_state = state["deliveries"].setdefault(delivery_key, {})
-    pending = state.setdefault("pending_messages", {})
-    delivered_any = False
-    failed = False
+    delivery_state = (
+        state["deliveries"]
+        .setdefault(
+            delivery_key,
+            {},
+        )
+    )
 
     for chat_id in targets:
-        if delivery_state.get(chat_id) is True:
-            delivered_any = True
+
+        if (
+            delivery_state.get(
+                chat_id
+            )
+            is True
+        ):
+
             continue
+
         try:
-            send_telegram_to_target(chat_id, text, reply_markup=reply_markup)
-            delivery_state[chat_id] = True
-            delivered_any = True
-            print(f"Delivered {delivery_key} -> {chat_id}")
+
+            send_telegram_to_target(
+                chat_id,
+                text,
+                reply_markup=reply_markup,
+            )
+
+            delivery_state[
+                chat_id
+            ] = True
+
+            print(
+                f"Delivered "
+                f"{delivery_key} -> "
+                f"{chat_id}"
+            )
+
         except Exception as error:
-            delivery_state[chat_id] = False
-            failed = True
-            print(f"Telegram delivery failed for {chat_id}: {error}")
 
-    if failed:
-        pending[delivery_key] = {
-            "text": text,
-            "reply_markup": reply_markup,
-        }
-    else:
-        pending.pop(delivery_key, None)
+            print(
+                "Telegram delivery "
+                "failed for "
+                f"{chat_id}: {error}"
+            )
 
-    return delivered_any
-
-def retry_pending_telegram_deliveries(state):
-    """Retry persisted Telegram messages for targets that have not received them."""
-    targets = telegram_targets()
-    if not targets:
-        return
-
-    pending = state.setdefault("pending_messages", {})
-    deliveries = state.setdefault("deliveries", {})
-
-    for delivery_key, payload in list(pending.items()):
-        if not isinstance(payload, dict):
-            pending.pop(delivery_key, None)
-            continue
-        text = payload.get("text", "")
-        reply_markup = payload.get("reply_markup")
-        if not text:
-            pending.pop(delivery_key, None)
-            continue
-
-        per_target = deliveries.setdefault(delivery_key, {})
-        failed = False
-        for chat_id in targets:
-            if per_target.get(chat_id) is True:
-                continue
-            try:
-                send_telegram_to_target(chat_id, text, reply_markup=reply_markup)
-                per_target[chat_id] = True
-                print(f"Retry delivered {delivery_key} -> {chat_id}")
-            except Exception as error:
-                per_target[chat_id] = False
-                failed = True
-                print(f"Retry Telegram delivery failed for {chat_id}: {error}")
-
-        if not failed:
-            pending.pop(delivery_key, None)
-
-    save_state(state)
+    return all(
+        delivery_state.get(
+            chat_id
+        )
+        is True
+        for chat_id in targets
+    )
 
 
 # =========================================================
@@ -1642,7 +1600,7 @@ def allocate_trade(state):
     margin = FIXED_MARGIN
     notional = margin * LEVERAGE
 
-    # No global maximum-open-position limit is applied.
+    # Never exceed the configured maximum number of simulated open positions.
     # Always recover a valid unique number, even if an old state file was
     # manually edited or contains a missing/invalid next_trade_number.
     used = []
@@ -1669,15 +1627,36 @@ def allocate_trade(state):
 
 
 def close_trade(state, info, active, exit_price, reason, candle_time=None):
+    """Close a position, apply PnL to the real balance, and charge one fee.
+
+    The fee is charged exactly once per closed position, regardless of whether
+    the position closes at TP40 or at the current/trailing SL.
+    """
     entry = float(active["entry_price"])
     notional = float(active.get("notional", 0.0))
-    pnl = trade_pnl(entry, float(exit_price), active["side"], notional)
+    gross_pnl = trade_pnl(entry, float(exit_price), active["side"], notional)
+
+    # Fixed exchange fee: one dollar per closed position.
+    fee = float(CLOSE_TRADE_FEE)
+    net_pnl = gross_pnl - fee
+
     portfolio = state["portfolio"]
     balance_before = float(portfolio["balance"])
-    balance_after = balance_before + pnl
+    balance_after = balance_before + net_pnl
+
+    # THIS is the real account balance used by all future trades/reports.
     portfolio["balance"] = balance_after
-    portfolio["total_realized_pnl"] = float(portfolio.get("total_realized_pnl", 0.0)) + pnl
-    record_equity_point(state, f"trade #{active.get('trade_number')} {reason}")
+    portfolio["total_realized_pnl"] = (
+        float(portfolio.get("total_realized_pnl", 0.0)) + net_pnl
+    )
+    portfolio["total_fees"] = (
+        float(portfolio.get("total_fees", 0.0)) + fee
+    )
+
+    record_equity_point(
+        state,
+        f"trade #{active.get('trade_number')} {reason}",
+    )
 
     closed = {
         "trade_number": active.get("trade_number"),
@@ -1692,7 +1671,9 @@ def close_trade(state, info, active, exit_price, reason, candle_time=None):
         "margin": float(active.get("margin", 0.0)),
         "notional": notional,
         "leverage": LEVERAGE,
-        "pnl": pnl,
+        "gross_pnl": gross_pnl,
+        "fee": fee,
+        "pnl": net_pnl,
         "balance_before": balance_before,
         "balance_after": balance_after,
         "reason": reason,
@@ -1707,11 +1688,11 @@ def close_trade(state, info, active, exit_price, reason, candle_time=None):
     state["closed_trades"].append(closed)
 
     signal_time = active["signal_time"]
-    if pnl > 1e-12:
+    if net_pnl > 1e-12:
         register_daily_tp(state, active["signal_id"], signal_time)
         register_monthly_tp(state, active["signal_id"], signal_time)
         register_weekly_tp(state, active["signal_id"], signal_time)
-    elif pnl < -1e-12:
+    elif net_pnl < -1e-12:
         register_daily_sl(state, active["signal_id"], signal_time)
         register_monthly_sl(state, active["signal_id"], signal_time)
         register_weekly_sl(state, active["signal_id"], signal_time)
@@ -1722,9 +1703,13 @@ def close_trade(state, info, active, exit_price, reason, candle_time=None):
 
 
 def trade_details_text(trade, title="📋 جزئیات معامله"):
-    pnl = float(trade.get("pnl", 0.0))
+    net_pnl = float(trade.get("pnl", 0.0))
+    gross_pnl = float(trade.get("gross_pnl", net_pnl))
+    fee = float(trade.get("fee", CLOSE_TRADE_FEE))
+    balance_before = float(trade.get("balance_before", 0.0))
     balance = float(trade.get("balance_after", 0.0))
-    sign = "+" if pnl >= 0 else ""
+    gross_sign = "+" if gross_pnl >= 0 else ""
+    net_sign = "+" if net_pnl >= 0 else ""
     return (
         f"{title}\n\n"
         f"🔢 شماره معامله: #{trade.get('trade_number')}\n"
@@ -1738,9 +1723,12 @@ def trade_details_text(trade, title="📋 جزئیات معامله"):
         f"SL اولیه: {float(trade.get('initial_sl', 0)):.12g}\n"
         f"SL فعلی: {float(trade.get('current_sl', trade.get('initial_sl', 0))):.12g}\n"
         f"آخرین TP: {trade.get('last_tp_hit') or 'هیچ‌کدام'}\n"
-        f"نتیجه: {trade.get('reason')}\n"
-        f"PnL: {sign}${pnl:.2f}\n"
-        f"موجودی بعد معامله: ${balance:.2f}\n\n"
+        f"نتیجه: {trade.get('reason')}\n\n"
+        f"📈 سود/ضرر ناخالص: {gross_sign}${gross_pnl:.2f}\n"
+        f"💳 کارمزد صرافی: -${fee:.2f}\n"
+        f"💰 سود/ضرر خالص: {net_sign}${net_pnl:.2f}\n\n"
+        f"💵 موجودی قبل معامله: ${balance_before:.2f}\n"
+        f"💵 موجودی بعد معامله: ${balance:.2f}\n\n"
         f"{TELEGRAM_SIGNATURE}"
     )
 
@@ -1824,7 +1812,8 @@ def signal_text(info, signal, trade_number=None, margin=None, notional=None):
 
 def stop_text(info, active, exit_price=None, pnl=None):
     sign = "+" if pnl is not None and pnl >= 0 else ""
-    pnl_line = f"PnL: {sign}${pnl:.2f}" if pnl is not None else ""
+    pnl_line = f"سود/ضرر ناخالص: {sign}${pnl:.2f}" if pnl is not None else ""
+    fee_line = f"کارمزد صرافی: -${CLOSE_TRADE_FEE:.2f}" if pnl is not None else ""
     return (
         "🛑 معامله بسته شد روی SL\n\n"
         f"🔢 شماره معامله: #{active.get('trade_number')}\n"
@@ -1834,6 +1823,8 @@ def stop_text(info, active, exit_price=None, pnl=None):
         f"SL فعال: {float(active.get('current_sl', active.get('sl'))):.12g}\n"
         + (f"خروج: {float(exit_price):.12g}\n" if exit_price is not None else "")
         + (pnl_line + "\n" if pnl is not None else "")
+        + (fee_line + "\n" if pnl is not None else "")
+        + (f"سود/ضرر خالص: ${pnl - CLOSE_TRADE_FEE:+.2f}\n" if pnl is not None else "")
         + f"\n{TELEGRAM_SIGNATURE}"
     )
 
@@ -1876,172 +1867,73 @@ def calculate_tp_price(
 # TAKE PROFIT CHECK
 # =========================================================
 
-def download_tp_monitor(symbol):
-    """Fetch recent LIVE 5m Binance candles for TP detection.
-
-    Binance Spot public klines are used; no API key is required.  We keep the
-    currently forming 5m candle because TP is an intrabar event.
-    """
-    return _binance_kline(symbol, 1000, "5m", "SPOT", keep_forming=True)
-
-
-def _trade_activation_time(active):
-    """Use the actual time the simulated trade became active.
-
-    Older state files may not have activated_at, so signal_time is retained as
-    a backwards-compatible fallback.
-    """
-    value = active.get("activated_at") or active.get("signal_time")
-    return pd.to_datetime(value, utc=True, errors="coerce")
-
-
-def check_take_profits(state, info, df=None):
-    """Detect every TP touched since the trade was actually activated.
-
-    TP is intentionally independent from the 4H scanner.  This function uses
-    live Binance 5m candles, so a TP touched and then retraced between two
-    GitHub Actions runs is still visible in the 5m High/Low.
-    """
-    active = state.get("active", {}).get(info["symbol"])
-    if not active:
+def check_take_profits(state, info, df):
+    active = state["active"].get(info["symbol"])
+    if not active or len(df) < 2:
         return
-
-    monitor_df = download_tp_monitor(info["symbol"])
-    if monitor_df is None or monitor_df.empty:
-        print(f"{info['symbol']}: TP monitor data unavailable; keeping trade open.")
-        return
-
+    # TP is monitored from the newest available candle so the 5-minute
+    # GitHub Actions worker can report an intrabar TP hit without waiting
+    # for the 4H candle to close. Signal generation itself still uses only
+    # completed 4H candles.
+    monitor_idx = -1
+    high = float(df["High"].iloc[monitor_idx])
+    low = float(df["Low"].iloc[monitor_idx])
     try:
         entry = float(active["entry_price"])
-        side = str(active["side"]).upper()
+        side = active["side"]
     except (KeyError, TypeError, ValueError):
-        print(f"{info['symbol']}: invalid live entry/side; skipping TP check.")
+        print(f"{info['symbol']}: active trade has no valid entry_price; skipping TP check.")
         return
-
-    activation_time = _trade_activation_time(active)
-    if pd.notna(activation_time):
-        monitor_df = monitor_df[monitor_df.index >= activation_time]
-    if monitor_df.empty:
-        return
-
     levels = tp_levels_for_side(side)
 
-    # Process every unhit level.  If one candle crossed several levels, all of
-    # them are delivered in order instead of stopping after the first one.
     for index, (tp_name, tp_percent) in enumerate(levels):
         hit_key = tp_hit_key(tp_name)
-        if active.get(hit_key, False) or tp_percent is None:
+        if active.get(hit_key, False):
             continue
-
+        if tp_percent is None:
+            continue
         tp_price = calculate_tp_price(entry, side, tp_percent)
-        if side == "BUY":
-            hit_rows = monitor_df[monitor_df["High"] >= tp_price]
-        else:
-            hit_rows = monitor_df[monitor_df["Low"] <= tp_price]
-
-        if hit_rows.empty:
+        hit = high >= tp_price if side == "BUY" else low <= tp_price
+        if not hit:
             continue
 
-        hit_candle = hit_rows.iloc[0]
-        hit_time = hit_rows.index[0].isoformat()
-
+        # Trailing rule:
+        # TP1 keeps original SL.
+        # TP2 moves SL to entry.
+        # TP3-TP8 move SL two TP levels back (old behavior).
+        # From TP9 onward SL moves to the immediately previous TP.
+        # TP40 is the final / FULL TP and closes the trade.
         if index == 0:
             new_sl = float(active.get("current_sl", active.get("initial_sl", active["sl"])))
         elif index == 1:
             new_sl = entry
         elif index >= 8:
-            _, previous_percent = levels[index - 1]
-            if previous_percent is None:
-                continue
+            previous_name, previous_percent = levels[index - 1]
             new_sl = calculate_tp_price(entry, side, previous_percent)
         else:
-            _, previous_percent = levels[index - 2]
+            previous_name, previous_percent = levels[index - 2]
             new_sl = calculate_tp_price(entry, side, previous_percent)
 
         delivery_key = f"TP|{info['symbol']}|{active['signal_id']}|{tp_name}"
         text = tp_text(info, active, tp_name, tp_percent, tp_price, new_sl)
-
-        # A Telegram failure must NOT mark the TP as hit.  It remains pending
-        # and will be retried on the next run.
         if not deliver_once(state, delivery_key, text):
             save_state(state)
             return
 
         active[hit_key] = True
         active["last_tp_hit"] = tp_name
-        active.setdefault("tp_hits", []).append({
-            "name": tp_name,
-            "percent": tp_percent,
-            "price": float(tp_price),
-            "time": hit_time,
-            "new_sl": float(new_sl),
-        })
+        active.setdefault("tp_hits", []).append({"name": tp_name, "percent": tp_percent, "price": float(tp_price), "time": utc_now(), "new_sl": float(new_sl)})
         active["current_sl"] = float(new_sl)
         active["sl"] = float(new_sl)
-
-        if tp_name == "TP1":
-            active["tp1_hit"] = True
-        if tp_name == "TP2":
-            active["tp2_hit"] = True
-        if tp_name == "TP40":
-            active["full_tp_hit"] = True
-
         save_state(state)
 
-        high = float(hit_candle["High"])
-        low = float(hit_candle["Low"])
-        print(
-            f"{info['symbol']}: {tp_name} HIT | candle={hit_time} "
-            f"high={high:.12g} low={low:.12g} target={tp_price:.12g} "
-            f"| SL -> {new_sl:.12g}"
-        )
+        print(f"{info['symbol']}: {tp_name} hit at {tp_price:.12g}; SL -> {new_sl:.12g}")
 
         if tp_name == "TP40":
-            closed = close_trade(
-                state,
-                info,
-                active,
-                tp_price,
-                "FULL TP (TP40)",
-                hit_time,
-            )
-            print(
-                f"{info['symbol']}: TP40 / Full TP closed trade "
-                f"#{closed.get('trade_number')}"
-            )
+            closed = close_trade(state, info, active, tp_price, "FULL TP (TP40)", df.index[monitor_idx].isoformat())
+            print(f"{info['symbol']}: TP40 / Full TP closed trade #{closed.get('trade_number')}")
             return
 
-    active["tp_last_scan_time"] = monitor_df.index[-1].isoformat()
-    save_state(state)
-
-
-def check_all_active_take_profits(state, symbol_lookup):
-    """Run TP monitoring for ALL active trades before the 4H scan.
-
-    This is the important reliability fix: a 4H data failure, a temporary
-    Binance 4H timeout, or a symbol with no new signal must never prevent an
-    already-open trade from receiving its TP notification.
-    """
-    active_items = list(state.get("active", {}).items())
-    if not active_items:
-        return
-
-    print(f"TP monitor active trades: {len(active_items)}")
-    for symbol, active in active_items:
-        info = symbol_lookup.get(symbol)
-        if not info:
-            # Active trades created from an older state can still be monitored
-            # even if the symbol is no longer present in the current requested
-            # list.  Reconstruct the minimum metadata required by TP messages.
-            info = {
-                "symbol": symbol,
-                "name": active.get("name", symbol),
-                "market_source": "SPOT",
-            }
-        try:
-            check_take_profits(state, info, None)
-        except Exception as error:
-            print(f"{symbol}: TP monitor ERROR: {error}")
 
 # =========================================================
 # STOP LOSS CHECK
@@ -2052,14 +1944,9 @@ def check_stop(state, info, df):
     if not active or len(df) < 2:
         return
 
-    # User rule: once TP1 has been reached, never send a later SL message
-    # for that signal. Higher TP levels continue to be monitored.
-    if active.get("tp1_hit", False):
-        return
-
     try:
         # SL is based on the close of a fully completed 4H candle.
-        close = float(df["Close"].iloc[-1])
+        close = float(df["Close"].iloc[-2])
         sl = float(active.get("current_sl", active.get("sl")))
         entry = float(active["entry_price"])
     except (KeyError, TypeError, ValueError):
@@ -2068,7 +1955,7 @@ def check_stop(state, info, df):
     hit = close < sl if active["side"] == "BUY" else close > sl
     if not hit:
         return
-    candle_time = df.index[-1].isoformat()
+    candle_time = df.index[-2].isoformat()
     delivery_key = f"STOP|{info['symbol']}|{active['signal_id']}|{candle_time}|{sl:.12g}"
     # PnL is calculated once, after the stop notification is successfully delivered.
     pnl = trade_pnl(float(active["entry_price"]), sl, active["side"], float(active.get("notional", 0.0)))
@@ -2458,9 +2345,8 @@ def add_ob_distance(signal, df):
 # ANALYZE SYMBOL
 # =========================================================
 
-def analyze_symbol(state, info, df, monitor_df=None):
-    # TP is monitored globally before the 4H scan. SL remains based on the
-    # latest completed 4H candle close.
+def analyze_symbol(state, info, df):
+    check_take_profits(state, info, df)
     check_stop(state, info, df)
 
     signals = latest_signals(df)
@@ -2530,7 +2416,7 @@ def analyze_symbol(state, info, df, monitor_df=None):
         save_state(state)
         return
 
-    daily_df = download_1d(info["symbol"], info.get("market_source", "SPOT"))
+    daily_df = download_1d(info["symbol"])
     daily_signal = latest_daily_order(daily_df)
     if not daily_order_matches(signal, daily_signal):
         print(f"{info['symbol']}: {signal['side']} 4H signal disabled because Daily order is missing/opposite.")
@@ -2582,7 +2468,6 @@ def analyze_symbol(state, info, df, monitor_df=None):
         "sl": float(signal["sl"]),
         "entry_price": entry_price,
         "signal_time": signal["event_time"],
-        "activated_at": datetime.now(timezone.utc).isoformat(),
         "margin": margin,
         "notional": notional,
         "leverage": LEVERAGE,
@@ -2640,41 +2525,34 @@ def main():
     state = load_state()
     update_period_openings(state)
     record_equity_point(state, "heartbeat")
-    # Retry any TP/SL/signal messages that reached one Telegram target but
-    # failed on another target during a previous run.
-    retry_pending_telegram_deliveries(state)
     # Telegram commands are handled by the separate command workflow.
 
     binance_symbols = get_binance_spot_symbols()
-
-    symbol_lookup = {info["symbol"]: info for info in binance_symbols}
-    # IMPORTANT: TP monitoring is independent of the 4H scan.
-    check_all_active_take_profits(state, symbol_lookup)
 
     workers = max(1, min(BINANCE_SCAN_WORKERS, 32))
     print(f"Binance parallel scan workers: {workers}")
 
     results = {}
     with ThreadPoolExecutor(max_workers=workers) as executor:
-        future_map = {executor.submit(download_4h_bundle, info["symbol"], "SPOT"): info for info in binance_symbols}
+        future_map = {executor.submit(download_4h, info["symbol"]): info for info in binance_symbols}
         for future in as_completed(future_map):
             info = future_map[future]
             symbol = info["symbol"]
             try:
                 results[symbol] = future.result()
             except Exception as error:
-                results[symbol] = (None, None)
+                results[symbol] = None
                 print(f"{symbol}: ERROR: {error}")
 
     for info in binance_symbols:
         symbol = info["symbol"]
-        df, monitor_df = results.get(symbol, (None, None))
+        df = results.get(symbol)
         if df is None or len(df) < 30:
             print(f"{symbol}: insufficient data")
             continue
-        print(f"{symbol} [SPOT] rows={len(df)}")
+        print(f"{symbol} rows={len(df)}")
         try:
-            analyze_symbol(state, info, df, monitor_df=monitor_df)
+            analyze_symbol(state, info, df)
         except Exception as error:
             print(f"{symbol}: ERROR: {error}")
 
