@@ -20,6 +20,13 @@ CANDIDATE_END = 15
 YAHOO_PAGE_SIZE = 250
 
 # =========================
+# CUSTOM COIN WATCHLIST
+# =========================
+# The scanner checks ONLY the symbols listed in coins.txt.
+# Symbols are sent to Yahoo Finance exactly as written in that file.
+COINS_FILE = os.getenv("CRYPTO_COINS_FILE", "coins.txt")
+
+# =========================
 # TAKE PROFIT SETTINGS
 # =========================
 
@@ -39,7 +46,6 @@ TP8_PERCENT = 20.0
 STARTING_BALANCE = 200.0
 MARGIN_PERCENT = 10.0
 LEVERAGE = 10.0
-FEE_PER_TRADE = 1.0  # fixed exchange fee charged once when a position closes
 
 # Maximum allowed distance between the signal event close and the
 # selected Order Block boundary. Kept identical to the original filter.
@@ -137,7 +143,6 @@ def load_state():
                 "balance": STARTING_BALANCE,
                 "next_trade_number": 1,
                 "total_realized_pnl": 0.0,
-                "total_fees": 0.0,
                 "period_opening_balances": {},
                 "equity_curve": [],
             },
@@ -217,7 +222,6 @@ def load_state():
     portfolio.setdefault("balance", STARTING_BALANCE)
     portfolio.setdefault("next_trade_number", 1)
     portfolio.setdefault("total_realized_pnl", 0.0)
-    portfolio.setdefault("total_fees", 0.0)
     portfolio.setdefault("period_opening_balances", {})
     portfolio.setdefault("equity_curve", [])
     state.setdefault("telegram_update_offset", 0)
@@ -862,6 +866,59 @@ def count_open_monthly_trades(
             count += 1
 
     return count
+
+
+# =========================================================
+# CUSTOM COIN LIST
+# =========================================================
+
+def get_custom_crypto_symbols():
+    """
+    Load the user's custom symbol list from coins.txt.
+    Empty lines and # comments are ignored.
+    Duplicate symbols are removed while preserving order.
+    """
+    if not os.path.exists(COINS_FILE):
+        raise RuntimeError(
+            f"Custom coin list not found: {COINS_FILE}"
+        )
+
+    symbols = []
+    seen = set()
+
+    with open(COINS_FILE, "r", encoding="utf-8") as handle:
+        for raw_line in handle:
+            symbol = raw_line.strip()
+
+            if not symbol or symbol.startswith("#"):
+                continue
+
+            symbol = symbol.upper()
+
+            if symbol not in seen:
+                seen.add(symbol)
+                symbols.append(symbol)
+
+    if not symbols:
+        raise RuntimeError(
+            f"Custom coin list is empty: {COINS_FILE}"
+        )
+
+    rows = [
+        {
+            "symbol": symbol,
+            "name": symbol,
+            "rank": None,
+        }
+        for symbol in symbols
+    ]
+
+    print(
+        f"Custom coin list loaded: {len(rows)} symbols "
+        f"from {COINS_FILE}"
+    )
+
+    return rows
 
 
 # =========================================================
@@ -1764,16 +1821,12 @@ def allocate_trade(state):
 def close_trade(state, info, active, exit_price, reason, candle_time=None):
     entry = float(active["entry_price"])
     notional = float(active.get("notional", 0.0))
-    gross_pnl = trade_pnl(entry, float(exit_price), active["side"], notional)
-    fee = float(FEE_PER_TRADE)
-    net_pnl = gross_pnl - fee
-
+    pnl = trade_pnl(entry, float(exit_price), active["side"], notional)
     portfolio = state["portfolio"]
     balance_before = float(portfolio["balance"])
-    balance_after = balance_before + net_pnl
+    balance_after = balance_before + pnl
     portfolio["balance"] = balance_after
-    portfolio["total_realized_pnl"] = float(portfolio.get("total_realized_pnl", 0.0)) + net_pnl
-    portfolio["total_fees"] = float(portfolio.get("total_fees", 0.0)) + fee
+    portfolio["total_realized_pnl"] = float(portfolio.get("total_realized_pnl", 0.0)) + pnl
     record_equity_point(state, f"trade #{active.get('trade_number')} {reason}")
 
     closed = {
@@ -1790,9 +1843,7 @@ def close_trade(state, info, active, exit_price, reason, candle_time=None):
         "margin": float(active.get("margin", 0.0)),
         "notional": notional,
         "leverage": LEVERAGE,
-        "gross_pnl": gross_pnl,
-        "fee": fee,
-        "pnl": net_pnl,
+        "pnl": pnl,
         "balance_before": balance_before,
         "balance_after": balance_after,
         "reason": reason,
@@ -1807,13 +1858,11 @@ def close_trade(state, info, active, exit_price, reason, candle_time=None):
     state["closed_trades"].append(closed)
 
     signal_time = active["signal_time"]
-    # Classification is based on the trade result before the fixed fee, so a
-    # profitable TP is not turned into an SL just because the fee is $1.
-    if gross_pnl > 1e-12:
+    if pnl > 1e-12:
         register_daily_tp(state, active["signal_id"], signal_time)
         register_monthly_tp(state, active["signal_id"], signal_time)
         register_weekly_tp(state, active["signal_id"], signal_time)
-    else:
+    elif pnl < -1e-12:
         register_daily_sl(state, active["signal_id"], signal_time)
         register_monthly_sl(state, active["signal_id"], signal_time)
         register_weekly_sl(state, active["signal_id"], signal_time)
@@ -1829,7 +1878,7 @@ def trade_details_text(trade, title="📋 جزئیات معامله"):
     sign = "+" if pnl >= 0 else ""
     return (
         f"{title}\n\n"
-        f"🔢 شناسه معامله: #TRD-{int(trade.get('trade_number', 0)):04d}\n"
+        f"🔢 شماره معامله: #{trade.get('trade_number')}\n"
         f"نماد: {trade.get('symbol')}\n"
         f"جهت: {trade.get('side')}\n"
         f"ورود: {float(trade.get('entry_price', 0)):.12g}\n"
@@ -1841,10 +1890,8 @@ def trade_details_text(trade, title="📋 جزئیات معامله"):
         f"SL فعلی: {float(trade.get('current_sl', trade.get('initial_sl', 0))):.12g}\n"
         f"آخرین TP: {trade.get('last_tp_hit') or 'هیچ‌کدام'}\n"
         f"نتیجه: {trade.get('reason')}\n"
-        f"سود/ضرر ناخالص: {"+" if float(trade.get("gross_pnl", pnl)) >= 0 else ""}${float(trade.get("gross_pnl", pnl)):.2f}\n"
-        f"کارمزد: -${float(trade.get("fee", FEE_PER_TRADE)):.2f}\n"
-        f"سود/ضرر خالص: {sign}${pnl:.2f}\n"
-        f"موجودی کل بعد معامله: ${balance:.2f}\n\n"
+        f"PnL: {sign}${pnl:.2f}\n"
+        f"موجودی بعد معامله: ${balance:.2f}\n\n"
         f"{TELEGRAM_SIGNATURE}"
     )
 
@@ -1853,7 +1900,7 @@ def active_trade_details_text(active, info):
     lines = [
         "📋 جزئیات معامله فعال",
         "",
-        f"🔢 شناسه معامله: #TRD-{int(active.get('trade_number', 0)):04d}",
+        f"🔢 شماره معامله: #{active.get('trade_number')}",
         f"نماد: {info.get('symbol')}",
         f"نام: {info.get('name', info.get('symbol'))}",
         f"جهت: {active.get('side')}",
@@ -1888,117 +1935,67 @@ def active_trade_details_text(active, info):
 
 def signal_text(info, signal, trade_number=None, margin=None, notional=None):
     entry = float(signal["zone_low"] if signal["side"] == "BUY" else signal["zone_high"])
-    side_label = "BUY / خرید" if signal["side"] == "BUY" else "SELL / فروش"
-    levels = tp_levels()
     lines = [
-        "🚨 سیگنال جدید کریپتو",
-        "━━━━━━━━━━━━━━━━",
-        f"📌 نوع معامله: {side_label}",
-        f"🔢 شناسه معامله: #TRD-{int(trade_number):04d}" if trade_number is not None else "🔢 شناسه معامله: در حال ثبت",
-        f"🪙 نماد: {info['symbol']}",
-        f"🏷 نام: {info['name']}",
-        f"📊 رتبه یاهو: {info['rank']}",
-        "⏱ تایم‌فریم: 4H",
+        "🟢 سیگنال خرید" if signal["side"] == "BUY" else "🔴 سیگنال فروش",
         "",
-        f"📍 نقطه ورود: {entry:.12g}",
-        f"🛑 حد ضرر اولیه: {float(signal['sl']):.12g}",
+        f"🔢 شماره معامله: #{trade_number}" if trade_number is not None else "🔢 شماره معامله: در حال ثبت",
+        f"نماد: {info['symbol']}",
+        f"نام: {info['name']}",
+        f"رتبه یاهو: {info['rank']}",
+        "تایم‌فریم: 4H",
+        "",
+        f"📍 ورود: {entry:.12g}",
+        f"🛑 SL اولیه: {float(signal['sl']):.12g}",
     ]
     if margin is not None and notional is not None:
         lines += [f"💵 مارجین: ${margin:.2f}", f"📊 ارزش پوزیشن: ${notional:.2f}", f"⚡ اهرم: {LEVERAGE:g}x"]
-    lines += ["", "🎯 اهداف اولیه:"]
+    lines += ["", "🎯 اهداف:"]
+    # فقط TP1 و TP2 در پیام اصلی نمایش داده می‌شوند.
+    levels = tp_levels()
     for name, percent in levels[:2]:
         lines.append(f"{name}: {calculate_tp_price(entry, signal['side'], percent):.12g} (+{percent:g}%)")
     lines += [
         "",
-        "📈 مدیریت معامله: بعد از فعال شدن هر TP، حد ضرر طبق پلن به‌روزرسانی می‌شود.",
-        "🔒 سودهای قفل‌شده در پیام‌های TP نمایش داده می‌شوند.",
-        f"💰 بالانس هنگام ورود: ${float(margin / (MARGIN_PERCENT / 100.0)):.2f}" if margin is not None else "",
-        f"🕐 زمان سیگنال: {utc_now()}",
+        f"💰 موجودی مبنا: ${float(margin / (MARGIN_PERCENT / 100.0)):.2f}" if margin is not None else "",
+        f"زمان: {utc_now()}",
         "",
         TELEGRAM_SIGNATURE,
     ]
     return "\n".join(lines)
 
 
+
 # =========================================================
 # STOP LOSS MESSAGE
 # =========================================================
 
-def stop_text(info, active, exit_price=None, pnl=None, fee=None, balance_after=None, gross_pnl=None):
-    net = pnl if pnl is not None else 0.0
-    gross = gross_pnl if gross_pnl is not None else net
-    fee_value = FEE_PER_TRADE if fee is None else fee
-    sign_net = "+" if net >= 0 else ""
-    sign_gross = "+" if gross >= 0 else ""
+def stop_text(info, active, exit_price=None, pnl=None):
+    sign = "+" if pnl is not None and pnl >= 0 else ""
+    pnl_line = f"PnL: {sign}${pnl:.2f}" if pnl is not None else ""
     return (
-        "🛑 معامله بسته شد\n"
-        "━━━━━━━━━━━━━━━━\n\n"
-        f"🔢 شناسه معامله: #TRD-{int(active.get('trade_number', 0)):04d}\n"
-        f"🪙 نماد: {info['symbol']}\n"
-        f"📌 جهت: {active['side']}\n"
-        f"📍 ورود: {float(active['entry_price']):.12g}\n"
-        f"🛡 SL فعال: {float(active.get('current_sl', active.get('sl'))):.12g}\n"
-        + (f"🚪 خروج: {float(exit_price):.12g}\n" if exit_price is not None else "")
-        + f"📊 سود/ضرر ناخالص: {sign_gross}${gross:.2f}\n"
-        + f"💸 کارمزد صرافی: -${float(fee_value):.2f}\n"
-        + f"💰 سود/ضرر خالص: {sign_net}${net:.2f}\n"
-        + (f"🏦 بالانس کل بعد از بسته‌شدن: ${float(balance_after):.2f}\n" if balance_after is not None else "")
+        "🛑 معامله بسته شد روی SL\n\n"
+        f"🔢 شماره معامله: #{active.get('trade_number')}\n"
+        f"نماد: {info['symbol']}\n"
+        f"جهت: {active['side']}\n"
+        f"ورود: {float(active['entry_price']):.12g}\n"
+        f"SL فعال: {float(active.get('current_sl', active.get('sl'))):.12g}\n"
+        + (f"خروج: {float(exit_price):.12g}\n" if exit_price is not None else "")
+        + (pnl_line + "\n" if pnl is not None else "")
         + f"\n{TELEGRAM_SIGNATURE}"
     )
 
 
-def tp_progress_bar(active, current_tp_name=None):
-    total = len(tp_levels_for_side(active.get("side", "BUY")))
-    hit_count = sum(1 for name, percent in tp_levels_for_side(active.get("side", "BUY")) if percent is not None and active.get(tp_hit_key(name), False))
-    if current_tp_name and not active.get(tp_hit_key(current_tp_name), False):
-        hit_count += 1
-    filled = min(10, int(round((hit_count / max(total, 1)) * 10)))
-    return "█" * filled + "░" * (10 - filled), hit_count, total
-
-
-def profit_lock_text(entry, side, new_sl):
-    entry = float(entry)
-    new_sl = float(new_sl)
-    if side == "BUY":
-        locked = (new_sl - entry) / entry * 100.0
-    else:
-        locked = (entry - new_sl) / entry * 100.0
-    if locked > 1e-9:
-        return f"🔒 سود قفل‌شده: +{locked:.2f}%"
-    if abs(locked) <= 1e-9:
-        return "🔒 حد ضرر روی نقطه ورود قرار گرفت؛ ریسک قیمت قفل شد."
-    return "🛡 حد ضرر هنوز داخل ناحیه اولیه معامله است."
-
-
-def tp_text(info, active, tp_name, tp_percent, tp_price, new_sl, balance_after=None, closed=False, gross_pnl=None, fee=None, net_pnl=None):
-    bar, hit_count, total = tp_progress_bar(active, tp_name)
-    lines = [
-        f"🎯 {tp_name} فعال شد",
-        "━━━━━━━━━━━━━━━━",
-        f"🔢 شناسه معامله: #TRD-{int(active.get('trade_number', 0)):04d}",
-        f"🪙 نماد: {info['symbol']}",
-        f"📌 جهت: {active['side']}",
-        f"💵 قیمت هدف: {tp_price:.12g}",
-        f"📈 هدف: +{tp_percent:g}%",
-        f"🎯 پیشرفت: {bar}  {hit_count}/{total}",
-        f"🛡 SL جدید: {new_sl:.12g}",
-        profit_lock_text(active.get('entry_price', 0), active['side'], new_sl),
-    ]
-    if closed:
-        gross = float(gross_pnl or 0.0)
-        fee_value = FEE_PER_TRADE if fee is None else float(fee)
-        net = float(net_pnl if net_pnl is not None else gross - fee_value)
-        lines += [
-            "",
-            "🏁 معامله نهایی شد",
-            f"📊 سود/ضرر ناخالص: {'+' if gross >= 0 else ''}${gross:.2f}",
-            f"💸 کارمزد صرافی: -${fee_value:.2f}",
-            f"💰 سود/ضرر خالص: {'+' if net >= 0 else ''}${net:.2f}",
-        ]
-        if balance_after is not None:
-            lines.append(f"🏦 بالانس کل بعد از بسته‌شدن: ${float(balance_after):.2f}")
-    lines += ["", TELEGRAM_SIGNATURE]
-    return "\n".join(lines)
+def tp_text(info, active, tp_name, tp_percent, tp_price, new_sl):
+    return (
+        f"🎯 {tp_name} زده شد\n\n"
+        f"🔢 شماره معامله: #{active.get('trade_number')}\n"
+        f"نماد: {info['symbol']}\n"
+        f"جهت: {active['side']}\n"
+        f"قیمت هدف: {tp_price:.12g}\n"
+        f"هدف: +{tp_percent:g}%\n"
+        f"🛡 SL جدید: {new_sl:.12g}\n\n"
+        f"{TELEGRAM_SIGNATURE}"
+    )
 
 
 def calculate_tp_price(
@@ -2042,38 +2039,34 @@ def check_take_profits(state, info, df):
 
     for index, (tp_name, tp_percent) in enumerate(levels):
         hit_key = tp_hit_key(tp_name)
-        if active.get(hit_key, False) or tp_percent is None:
+        if active.get(hit_key, False):
+            continue
+        if tp_percent is None:
             continue
         tp_price = calculate_tp_price(entry, side, tp_percent)
         hit = high >= tp_price if side == "BUY" else low <= tp_price
         if not hit:
             continue
 
-        # همان منطق قبلی: TP1=SL اولیه، TP2=ورود، TP3-TP8 دو TP عقب،
-        # و از TP9 به بعد SL روی TP قبلی قرار می‌گیرد.
+        # Trailing rule:
+        # TP1 keeps original SL.
+        # TP2 moves SL to entry.
+        # TP3-TP8 move SL two TP levels back (old behavior).
+        # From TP9 onward SL moves to the immediately previous TP.
+        # TP40 is the final / FULL TP and closes the trade.
         if index == 0:
             new_sl = float(active.get("current_sl", active.get("initial_sl", active["sl"])))
         elif index == 1:
             new_sl = entry
         elif index >= 8:
-            _, previous_percent = levels[index - 1]
+            previous_name, previous_percent = levels[index - 1]
             new_sl = calculate_tp_price(entry, side, previous_percent)
         else:
-            _, previous_percent = levels[index - 2]
+            previous_name, previous_percent = levels[index - 2]
             new_sl = calculate_tp_price(entry, side, previous_percent)
 
-        is_final = tp_name == "TP40"
-        gross_pnl = trade_pnl(entry, tp_price, side, float(active.get("notional", 0.0))) if is_final else 0.0
-        fee = float(FEE_PER_TRADE) if is_final else 0.0
-        net_pnl = gross_pnl - fee if is_final else 0.0
-        balance_after = float(state["portfolio"]["balance"]) + net_pnl if is_final else None
-
         delivery_key = f"TP|{info['symbol']}|{active['signal_id']}|{tp_name}"
-        text = tp_text(
-            info, active, tp_name, tp_percent, tp_price, new_sl,
-            balance_after=balance_after, closed=is_final,
-            gross_pnl=gross_pnl, fee=fee, net_pnl=net_pnl,
-        )
+        text = tp_text(info, active, tp_name, tp_percent, tp_price, new_sl)
         if not deliver_once(state, delivery_key, text):
             save_state(state)
             return
@@ -2087,9 +2080,9 @@ def check_take_profits(state, info, df):
 
         print(f"{info['symbol']}: {tp_name} hit at {tp_price:.12g}; SL -> {new_sl:.12g}")
 
-        if is_final:
+        if tp_name == "TP40":
             closed = close_trade(state, info, active, tp_price, "FULL TP (TP40)", df.index[-2].isoformat())
-            print(f"{info['symbol']}: TP40 / Full TP closed trade #{closed.get('trade_number')} | balance=${closed.get('balance_after', 0):.2f}")
+            print(f"{info['symbol']}: TP40 / Full TP closed trade #{closed.get('trade_number')}")
             return
 
 
@@ -2104,6 +2097,7 @@ def check_stop(state, info, df):
     try:
         close = float(df["Close"].iloc[-2])
         sl = float(active.get("current_sl", active.get("sl")))
+        entry = float(active["entry_price"])
     except (KeyError, TypeError, ValueError):
         print(f"{info['symbol']}: active trade has incomplete pricing data; skipping SL check.")
         return
@@ -2112,16 +2106,14 @@ def check_stop(state, info, df):
         return
     candle_time = df.index[-2].isoformat()
     delivery_key = f"STOP|{info['symbol']}|{active['signal_id']}|{candle_time}|{sl:.12g}"
-    gross_pnl = trade_pnl(float(active["entry_price"]), sl, active["side"], float(active.get("notional", 0.0)))
-    fee = float(FEE_PER_TRADE)
-    net_pnl = gross_pnl - fee
-    balance_after = float(state["portfolio"]["balance"]) + net_pnl
-    text = stop_text(info, active, sl, net_pnl, fee=fee, balance_after=balance_after, gross_pnl=gross_pnl)
+    # PnL is calculated once, after the stop notification is successfully delivered.
+    pnl = trade_pnl(float(active["entry_price"]), sl, active["side"], float(active.get("notional", 0.0)))
+    text = stop_text(info, active, sl, pnl)
     if not deliver_once(state, delivery_key, text):
         save_state(state)
         return
-    closed = close_trade(state, info, active, sl, "TRAILING SL" if active.get("last_tp_hit") else "INITIAL SL", candle_time)
-    print(f"Stop loss sent for {info['symbol']} trade #{active.get('trade_number')} | balance=${closed.get('balance_after', 0):.2f}")
+    close_trade(state, info, active, sl, "TRAILING SL" if active.get("last_tp_hit") else "INITIAL SL", candle_time)
+    print(f"Stop loss sent for {info['symbol']} trade #{active.get('trade_number')}")
 
 
 def portfolio_metrics(state):
@@ -2144,41 +2136,28 @@ def portfolio_metrics(state):
 
 def daily_report_text(state, report_date):
     stats = get_daily_stats(state, report_date)
-    portfolio = state["portfolio"]
-    # این مقدار عمداً در لحظه ساخت گزارش از state خوانده می‌شود؛ بنابراین
-    # «بالانس فعلی» همیشه آخرین بالانس ثبت‌شده تا همان لحظه است.
-    current_balance = float(portfolio.get("balance", STARTING_BALANCE))
-    opening = float(portfolio.get("period_opening_balances", {}).get(f"DAY|{report_date}", portfolio.get("initial_balance", STARTING_BALANCE)))
-    pnl = current_balance - opening
+    opening = float(state["portfolio"].get("period_opening_balances", {}).get(f"DAY|{report_date}", state["portfolio"]["initial_balance"]))
+    closing = float(state["portfolio"]["balance"])
+    pnl = closing - opening
     closed = [t for t in state.get("closed_trades", []) if str(t.get("exit_time", "")).startswith(report_date)]
-    wins = sum(1 for t in closed if float(t.get("gross_pnl", t.get("pnl", 0))) > 0)
-    losses = sum(1 for t in closed if float(t.get("gross_pnl", t.get("pnl", 0))) <= 0)
-    fees = sum(float(t.get("fee", 0.0)) for t in closed)
+    wins = sum(1 for t in closed if float(t.get("pnl", 0)) > 0)
+    losses = sum(1 for t in closed if float(t.get("pnl", 0)) < 0)
     best = max((float(t.get("pnl", 0)) for t in closed), default=0.0)
     worst = min((float(t.get("pnl", 0)) for t in closed), default=0.0)
     peak, drawdown = portfolio_metrics(state)
-    total_closed = len(closed)
-    win_rate = (wins / total_closed * 100.0) if total_closed else 0.0
-    return (
-        f"📊 گزارش روزانه\n"
-        f"━━━━━━━━━━━━━━━━\n\n"
-        f"📅 تاریخ: {report_date}\n\n"
-        f"💰 موجودی ابتدای روز: ${opening:.2f}\n"
-        f"🏦 بالانس دقیق لحظه گزارش: ${current_balance:.2f}\n"
-        f"📈 سود/ضرر روز: {'+' if pnl >= 0 else ''}${pnl:.2f}\n"
-        f"📊 بازده روز: {(pnl/opening*100 if opening else 0):.2f}%\n"
-        f"💸 کارمزدهای امروز: -${fees:.2f}\n\n"
-        f"📨 سیگنال‌های امروز: {int(stats.get('signals', 0))}\n"
-        f"✅ معاملات سودده: {wins}\n"
-        f"❌ معاملات زیان‌ده: {losses}\n"
-        f"🎯 Win Rate: {win_rate:.2f}%\n"
-        f"📂 معاملات باز: {len(state.get('active', {}))}\n"
-        f"🏆 بهترین معامله: ${best:+.2f}\n"
-        f"💥 بدترین معامله: ${worst:+.2f}\n"
-        f"📈 بیشترین موجودی ثبت‌شده: ${peak:.2f}\n"
-        f"📉 Max Drawdown: {drawdown:.2f}%\n\n"
-        f"{TELEGRAM_SIGNATURE}"
-    )
+    return (f"📊 گزارش روزانه\n\n📅 تاریخ: {report_date}\n\n"
+            f"💰 موجودی ابتدای روز: ${opening:.2f}\n"
+            f"💰 موجودی فعلی: ${closing:.2f}\n"
+            f"📈 سود/ضرر روز: {'+' if pnl >= 0 else ''}${pnl:.2f}\n"
+            f"📊 بازده روز: {(pnl/opening*100 if opening else 0):.2f}%\n\n"
+            f"📨 سیگنال‌های امروز: {int(stats.get('signals',0))}\n"
+            f"✅ معاملات بسته‌شده سودده: {wins}\n"
+            f"❌ معاملات بسته‌شده زیان‌ده: {losses}\n"
+            f"🏆 بهترین معامله: ${best:+.2f}\n"
+            f"💥 بدترین معامله: ${worst:+.2f}\n"
+            f"📈 بیشترین موجودی ثبت‌شده: ${peak:.2f}\n"
+            f"📉 Max Drawdown: {drawdown:.2f}%\n"
+            f"📂 معاملات باز: {len(state.get('active',{}))}\n\n{TELEGRAM_SIGNATURE}")
 
 
 def should_send_daily_report():
@@ -2242,34 +2221,24 @@ def send_daily_report(
 # =========================================================
 
 def monthly_report_text(state, month_string):
-    portfolio = state["portfolio"]
-    opening = float(portfolio.get("period_opening_balances", {}).get(f"MONTH|{month_string}", portfolio.get("initial_balance", STARTING_BALANCE)))
+    opening = float(state["portfolio"].get("period_opening_balances", {}).get(f"MONTH|{month_string}", state["portfolio"]["initial_balance"]))
     trades = [t for t in state.get("closed_trades", []) if str(t.get("exit_time", "")).startswith(month_string)]
-    pnl = sum(float(t.get("pnl", 0)) for t in trades)
+    pnl = sum(float(t.get("pnl",0)) for t in trades)
     closing = opening + pnl
-    wins = sum(1 for t in trades if float(t.get("gross_pnl", t.get("pnl", 0))) > 0)
-    losses = sum(1 for t in trades if float(t.get("gross_pnl", t.get("pnl", 0))) <= 0)
-    fees = sum(float(t.get("fee", 0.0)) for t in trades)
+    wins = sum(1 for t in trades if float(t.get("pnl",0)) > 0)
+    losses = sum(1 for t in trades if float(t.get("pnl",0)) < 0)
     best = max((float(t.get("pnl", 0)) for t in trades), default=0.0)
     worst = min((float(t.get("pnl", 0)) for t in trades), default=0.0)
-    win_rate = (wins / len(trades) * 100.0) if trades else 0.0
-    return (
-        f"📊 گزارش ماهانه\n"
-        f"━━━━━━━━━━━━━━━━\n\n"
-        f"📅 ماه: {month_string}\n\n"
-        f"💰 موجودی ابتدای ماه: ${opening:.2f}\n"
-        f"🏦 موجودی پایان ماه: ${closing:.2f}\n"
-        f"📈 سود/ضرر خالص ماه: {'+' if pnl >= 0 else ''}${pnl:.2f}\n"
-        f"📊 بازده ماه: {(pnl/opening*100 if opening else 0):.2f}%\n"
-        f"💸 مجموع کارمزدها: -${fees:.2f}\n\n"
-        f"📊 معاملات بسته‌شده: {len(trades)}\n"
-        f"✅ سودده: {wins}\n"
-        f"❌ زیان‌ده: {losses}\n"
-        f"🎯 Win Rate: {win_rate:.2f}%\n"
-        f"🏆 بهترین معامله: ${best:+.2f}\n"
-        f"💥 بدترین معامله: ${worst:+.2f}\n\n"
-        f"{TELEGRAM_SIGNATURE}"
-    )
+    peak, drawdown = portfolio_metrics(state)
+    return (f"📊 گزارش ماهانه\n\n📅 ماه: {month_string}\n\n"
+            f"💰 موجودی ابتدای ماه: ${opening:.2f}\n"
+            f"💰 موجودی پایان ماه: ${closing:.2f}\n"
+            f"📈 سود/ضرر ماه: {'+' if pnl >= 0 else ''}${pnl:.2f}\n"
+            f"📊 بازده ماه: {(pnl/opening*100 if opening else 0):.2f}%\n\n"
+            f"📊 معاملات بسته‌شده: {len(trades)}\n"
+            f"✅ سودده: {wins}\n❌ زیان‌ده: {losses}\n"
+            f"🏆 بهترین معامله: ${best:+.2f}\n💥 بدترین معامله: ${worst:+.2f}\n"
+            f"📈 بیشترین موجودی: ${peak:.2f}\n📉 Max Drawdown: {drawdown:.2f}%\n\n{TELEGRAM_SIGNATURE}")
 
 
 def should_send_monthly_report():
@@ -2669,15 +2638,11 @@ def main():
     record_equity_point(state, "heartbeat")
     # Telegram commands are handled by the separate command workflow.
 
-    ranked = (
-        get_ranked_crypto_symbols()
-    )
+    ranked = get_custom_crypto_symbols()
 
     print(
         f"Loaded {len(ranked)} "
-        "Yahoo crypto symbols, "
-        f"ranks {RANK_START}-"
-        f"{RANK_END}"
+        "custom symbols from coins.txt"
     )
 
     for info in ranked:
@@ -2706,7 +2671,6 @@ def main():
 
             print(
                 f"{symbol} "
-                f"rank={info['rank']} "
                 f"rows={len(df)}"
             )
 
@@ -2739,7 +2703,7 @@ def main():
     save_state(state)
 
     print(
-        "Crypto scan completed."
+        "Crypto scan completed using custom coins.txt list."
     )
 
 
