@@ -1,11 +1,9 @@
-```yaml
 name: Crypto TradeIQ Scanner
 
 on:
   workflow_dispatch:
 
   schedule:
-    # اجرای اسکن هر 4 ساعت
     - cron: "5 */4 * * *"
 
 permissions:
@@ -16,24 +14,24 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1) دریافت فایل‌های ریپو
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2) نصب Python
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: "pip"
 
-      # 3) نصب کتابخانه‌های لازم
       - name: Install Python packages
         run: |
           python -m pip install --upgrade pip
           python -m pip install "requests>=2.31,<3" "pandas>=2.2,<3" "yfinance>=0.2.54,<1" numpy
 
-      # 4) اجرای ربات
+      - name: Verify dependencies
+        run: |
+          python -c "import yfinance, pandas, numpy, requests; print('All dependencies OK')"
+
       - name: Run crypto scanner
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -41,15 +39,12 @@ jobs:
         run: |
           python crypto_tradeiq.py
 
-      # 5) ذخیره signal_state_crypto.json
-      # تا وضعیت سیگنال‌ها، TPها، موجودی و معاملات
-      # بین اجرای بعدی GitHub Actions حفظ شود.
       - name: Save bot state
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add signal_state_crypto.json
+          git add kcex_signal_state.json telegram_command_state.json
 
           if git diff --cached --quiet; then
             echo "No state changes to commit."
@@ -57,4 +52,3 @@ jobs:
             git commit -m "Update crypto scanner state"
             git push
           fi
-```
