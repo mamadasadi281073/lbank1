@@ -1,30 +1,42 @@
 import os
 import re
 import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 
 import pandas as pd
 import requests
-import yfinance as yf
 
-STATE_FILE = "signal_state_crypto.json"
+STATE_FILE = "kcex_signal_state.json"
 
-RANK_START = int(os.getenv("CRYPTO_RANK_START", "300"))
-RANK_END = int(os.getenv("CRYPTO_RANK_END", "400"))
+# =========================
+# BINANCE SPOT SOURCE
+# =========================
+# Public market-data only. No Binance account/API key is required.
+# GitHub Actions is used as the execution environment so the scanner does
+# not depend on opening Binance in the user's local browser/network.
+COINS_FILE = os.getenv("COINS_FILE", "coins.txt")
+
+FALLBACK_SOURCE_SYMBOLS = [
+    "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT",
+    "ADAUSDT", "DOGEUSDT", "AVAXUSDT", "LINKUSDT", "DOTUSDT",
+]
+
+BINANCE_SPOT_BASE = os.getenv(
+    "BINANCE_SPOT_BASE",
+    "https://data-api.binance.vision",
+).rstrip("/")
+
+BINANCE_TIMEOUT = int(os.getenv("BINANCE_TIMEOUT", "15"))
+BINANCE_4H_BARS = int(os.getenv("BINANCE_4H_BARS", "400"))
+BINANCE_1D_BARS = int(os.getenv("BINANCE_1D_BARS", "800"))
+BINANCE_SCAN_WORKERS = int(os.getenv("BINANCE_SCAN_WORKERS", "16"))
 
 SENS = 0.28
 MIN_EVENT_SEPARATION = 5
 CANDIDATE_START = 4
 CANDIDATE_END = 15
 
-YAHOO_PAGE_SIZE = 250
-
-# =========================
-# CUSTOM COIN WATCHLIST
-# =========================
-# The scanner checks ONLY the symbols listed in coins.txt.
-# Symbols are sent to Yahoo Finance exactly as written in that file.
-COINS_FILE = os.getenv("CRYPTO_COINS_FILE", "coins.txt")
 
 # =========================
 # TAKE PROFIT SETTINGS
@@ -44,7 +56,7 @@ TP8_PERCENT = 20.0
 # TP40 is the final / FULL TP.
 
 STARTING_BALANCE = 200.0
-MARGIN_PERCENT = 10.0
+FIXED_MARGIN = 10.0
 LEVERAGE = 10.0
 
 # Maximum allowed distance between the signal event close and the
@@ -178,6 +190,14 @@ def load_state():
 
     state.setdefault(
         "last_signal",
+        {},
+    )
+
+    # Per-symbol bootstrap marker.  A missing marker means we have never
+    # established a baseline for that symbol, so historical signals are
+    # recorded but never sent as new Telegram signals.
+    state.setdefault(
+        "signal_baseline",
         {},
     )
 
@@ -423,7 +443,7 @@ def get_monthly_stats(
 
 def get_week_start(dt):
     # هفته از دوشنبه شروع می‌شود.
-    monday = dt - pd.Timedelta(days=dt.weekday())
+    monday = dt - pd.Timedelta(days=int(dt.weekday()))
     return monday.strftime("%Y-%m-%d")
 
 
@@ -869,451 +889,210 @@ def count_open_monthly_trades(
 
 
 # =========================================================
-# CUSTOM COIN LIST
+# BINANCE SYMBOL RESOLUTION
 # =========================================================
 
-def get_custom_crypto_symbols():
-    """
-    Load the user's custom symbol list from coins.txt.
-    Empty lines and # comments are ignored.
-    Duplicate symbols are removed while preserving order.
-    """
-    if not os.path.exists(COINS_FILE):
-        raise RuntimeError(
-            f"Custom coin list not found: {COINS_FILE}"
-        )
+def normalize_requested_symbol(value):
+    value = str(value or "").strip().upper()
+    if not value:
+        return ""
+    value = value.replace("/", "_").replace("-", "_").replace(" ", "")
+    if value.endswith("_USDT"):
+        value = value[:-5]
+    elif value.endswith("USDT"):
+        value = value[:-4]
+    return value
 
-    symbols = []
+
+def read_source_symbols():
+    path = COINS_FILE
+    if os.path.exists(path):
+        rows = []
+        with open(path, "r", encoding="utf-8") as f:
+            for raw in f:
+                raw = raw.strip()
+                if not raw or raw.startswith("#"):
+                    continue
+                rows.append(raw)
+        if rows:
+            print(f"Binance source file: {path} ({len(rows)} requested symbols)")
+            return rows
+
+    print(f"{path} was not found or empty; using embedded fallback list ({len(FALLBACK_SOURCE_SYMBOLS)} symbols).")
+    return list(FALLBACK_SOURCE_SYMBOLS)
+
+
+def binance_json_get(path, params=None):
+    url = BINANCE_SPOT_BASE.rstrip("/") + path
+    headers = {
+        "Accept": "application/json",
+        "User-Agent": "CryptoTradeIQ/1.0",
+    }
+    last_error = None
+    for attempt in range(3):
+        try:
+            response = requests.get(
+                url,
+                params=params or {},
+                headers=headers,
+                timeout=BINANCE_TIMEOUT,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            if isinstance(payload, dict) and payload.get("code") not in (None, 0):
+                raise RuntimeError(str(payload))
+            return payload
+        except Exception as error:
+            last_error = error
+            if attempt < 2:
+                import time
+                time.sleep(0.7 * (attempt + 1))
+    raise RuntimeError(f"Binance request failed: {url} | {last_error}")
+
+
+def get_binance_spot_symbols():
+    """Resolve requested coins against Binance Spot USDT markets."""
+    requested = read_source_symbols()
+    requested_bases = []
     seen = set()
 
-    with open(COINS_FILE, "r", encoding="utf-8") as handle:
-        for raw_line in handle:
-            symbol = raw_line.strip()
+    for item in requested:
+        base = normalize_requested_symbol(item)
+        if base and base not in seen:
+            seen.add(base)
+            requested_bases.append(base)
 
-            if not symbol or symbol.startswith("#"):
-                continue
+    payload = binance_json_get("/api/v3/exchangeInfo")
+    symbols = payload.get("symbols", []) if isinstance(payload, dict) else []
 
-            symbol = symbol.upper()
-
-            if symbol not in seen:
-                seen.add(symbol)
-                symbols.append(symbol)
-
-    if not symbols:
-        raise RuntimeError(
-            f"Custom coin list is empty: {COINS_FILE}"
-        )
-
-    rows = [
-        {
-            "symbol": symbol,
-            "name": symbol,
-            "rank": None,
-        }
-        for symbol in symbols
-    ]
-
-    print(
-        f"Custom coin list loaded: {len(rows)} symbols "
-        f"from {COINS_FILE}"
-    )
-
-    return rows
-
-
-# =========================================================
-# YAHOO CRYPTO RANKING
-# =========================================================
-
-def yahoo_headers():
-
-    return {
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/139.0.0.0 Safari/537.36"
-        ),
-        "Accept": (
-            "application/json,text/plain,*/*"
-        ),
-        "Referer": (
-            "https://finance.yahoo.com/"
-        ),
-    }
-
-
-def request_yahoo_screener(
-    start,
-    count,
-):
-
-    url = (
-        "https://query1.finance.yahoo.com/"
-        "v1/finance/screener/predefined/saved"
-    )
-
-    params = {
-        "scrIds": (
-            "all_cryptocurrencies_us"
-        ),
-        "count": count,
-        "start": start,
-    }
-
-    response = requests.get(
-        url,
-        params=params,
-        headers=yahoo_headers(),
-        timeout=30,
-    )
-
-    if response.status_code != 200:
-
-        raise RuntimeError(
-            "Yahoo screener HTTP error: "
-            f"{response.status_code} "
-            f"for start={start}, "
-            f"count={count}. "
-            f"Response: "
-            f"{response.text[:500]}"
-        )
-
-    try:
-
-        data = response.json()
-
-    except Exception as error:
-
-        raise RuntimeError(
-            "Yahoo returned invalid JSON: "
-            f"{error}"
-        )
-
-    finance = data.get(
-        "finance",
-        {},
-    )
-
-    result = finance.get(
-        "result",
-        [],
-    )
-
-    if not result:
-
-        error_info = finance.get(
-            "error"
-        )
-
-        raise RuntimeError(
-            "Yahoo returned no screener "
-            "result. "
-            f"Error: {error_info}"
-        )
-
-    quotes = result[0].get(
-        "quotes",
-        [],
-    )
-
-    if not quotes:
-
-        raise RuntimeError(
-            f"Yahoo returned no quotes "
-            f"for start={start}, "
-            f"count={count}."
-        )
-
-    return quotes
-
-
-def get_ranked_crypto_symbols():
-
-    if RANK_START < 1:
-
-        raise RuntimeError(
-            "CRYPTO_RANK_START must be >= 1."
-        )
-
-    if RANK_END < RANK_START:
-
-        raise RuntimeError(
-            "CRYPTO_RANK_END must be >= "
-            "CRYPTO_RANK_START."
-        )
-
-    required_end = RANK_END
-
-    all_quotes = []
-
-    start = 0
-
-    while len(all_quotes) < required_end:
-
-        remaining = (
-            required_end
-            - len(all_quotes)
-        )
-
-        count = min(
-            YAHOO_PAGE_SIZE,
-            remaining,
-        )
-
-        print(
-            "Requesting Yahoo crypto page: "
-            f"start={start}, "
-            f"count={count}"
-        )
-
-        quotes = request_yahoo_screener(
-            start=start,
-            count=count,
-        )
-
-        if not quotes:
-            break
-
-        previous_count = len(
-            all_quotes
-        )
-
-        all_quotes.extend(
-            quotes
-        )
-
-        print(
-            f"Yahoo returned "
-            f"{len(quotes)} rows "
-            f"for start={start}. "
-            f"Total collected: "
-            f"{len(all_quotes)}"
-        )
-
-        if start > 0:
-
-            previous_symbols = {
-                q.get("symbol")
-                for q in all_quotes[
-                    :previous_count
-                ]
-                if q.get("symbol")
-            }
-
-            current_symbols = {
-                q.get("symbol")
-                for q in quotes
-                if q.get("symbol")
-            }
-
-            if (
-                current_symbols
-                and current_symbols.issubset(
-                    previous_symbols
-                )
-            ):
-
-                raise RuntimeError(
-                    "Yahoo returned the same "
-                    "screener page again "
-                    "instead of advancing "
-                    f"to start={start}."
-                )
-
-        start += len(quotes)
-
-        if len(quotes) < count:
-            break
-
-    if len(all_quotes) < RANK_END:
-
-        raise RuntimeError(
-            "Yahoo did not return enough "
-            "crypto rows. "
-            f"Required through rank "
-            f"{RANK_END}, but only "
-            f"{len(all_quotes)} rows "
-            "were collected."
-        )
+    symbol_map = {}
+    for item in symbols:
+        if not isinstance(item, dict):
+            continue
+        if item.get("status") != "TRADING":
+            continue
+        if item.get("quoteAsset") != "USDT":
+            continue
+        symbol = str(item.get("symbol") or "").upper()
+        base = str(item.get("baseAsset") or "").upper()
+        if symbol and base:
+            symbol_map.setdefault(base, item)
 
     rows = []
+    missing = []
+    for base in requested_bases:
+        item = symbol_map.get(base)
+        if not item:
+            missing.append(base)
+            continue
+        rows.append({
+            "symbol": item["symbol"],
+            "name": base,
+            "source_symbol": base + "USDT",
+            "spot_symbol": item["symbol"],
+            "base_currency": base,
+            "clear_currency": "USDT",
+            "price_tick": next((x.get("tickSize") for x in item.get("filters", []) if x.get("filterType") == "PRICE_FILTER"), None),
+            "volume_tick": next((x.get("stepSize") for x in item.get("filters", []) if x.get("filterType") == "LOT_SIZE"), None),
+            "min_order_volume": next((x.get("minQty") for x in item.get("filters", []) if x.get("filterType") == "LOT_SIZE"), None),
+            "min_order_cost": None,
+            "default_leverage": None,
+        })
 
-    for position in range(
-        RANK_START - 1,
-        RANK_END,
-    ):
+    order = {base: i for i, base in enumerate(requested_bases)}
+    rows.sort(key=lambda row: order.get(normalize_requested_symbol(row["source_symbol"]), 999999))
 
-        q = all_quotes[position]
+    print(f"Binance requested symbols : {len(requested_bases)}")
+    print(f"Binance Spot matched   : {len(rows)}")
+    print(f"Binance Spot missing   : {len(missing)}")
+    if missing:
+        print("Not listed on Binance Spot: " + ", ".join(missing))
 
-        symbol = q.get(
-            "symbol"
-        )
-
-        if not symbol:
-
-            raise RuntimeError(
-                f"Yahoo rank "
-                f"{position + 1} "
-                "has no symbol."
-            )
-
-        name = (
-            q.get("longName")
-            or q.get("shortName")
-            or symbol
-        )
-
-        rows.append(
-            {
-                "symbol": symbol,
-                "name": name,
-                "rank": position + 1,
-            }
-        )
-
-    expected_count = (
-        RANK_END
-        - RANK_START
-        + 1
-    )
-
-    if len(rows) != expected_count:
-
-        raise RuntimeError(
-            "Yahoo rank extraction "
-            "failed. "
-            f"Expected {expected_count} "
-            f"rows, got {len(rows)}."
-        )
-
-    print(
-        "Yahoo ranks loaded correctly: "
-        f"{RANK_START}-{RANK_END} "
-        f"({len(rows)} symbols)"
-    )
-
-    print(
-        "First selected rank: "
-        f"{rows[0]['rank']} "
-        f"{rows[0]['symbol']}"
-    )
-
-    print(
-        "Last selected rank: "
-        f"{rows[-1]['rank']} "
-        f"{rows[-1]['symbol']}"
-    )
-
+    if not rows:
+        raise RuntimeError("None of the requested coins are currently available on Binance Spot.")
     return rows
 
 
 # =========================================================
-# YAHOO 4H DATA
+# BINANCE KLINE DATA
 # =========================================================
 
-def download_4h(symbol):
-
-    df = yf.download(
-        symbol,
-        period="60d",
-        interval="4h",
-        auto_adjust=False,
-        progress=False,
-        threads=False,
-    )
-
-    if df is None or df.empty:
-        return None
-
-    if isinstance(
-        df.columns,
-        pd.MultiIndex,
-    ):
-
-        df.columns = (
-            df.columns
-            .get_level_values(0)
+def _binance_kline(symbol, size, interval):
+    requested_size = min(int(size), 1500)
+    try:
+        payload = binance_json_get(
+            "/api/v3/klines",
+            {
+                "symbol": symbol,
+                "interval": interval,
+                "limit": requested_size,
+            },
         )
+        if not isinstance(payload, list) or not payload:
+            raise RuntimeError(f"Empty Kline response for {symbol} {interval}")
 
-    needed = [
-        "Open",
-        "High",
-        "Low",
-        "Close",
-    ]
+        rows = []
+        for item in payload:
+            if not isinstance(item, (list, tuple)) or len(item) < 6:
+                continue
+            try:
+                rows.append({
+                    "Time": pd.to_datetime(int(item[0]), unit="ms", utc=True),
+                    "Open": float(item[1]),
+                    "High": float(item[2]),
+                    "Low": float(item[3]),
+                    "Close": float(item[4]),
+                })
+            except (TypeError, ValueError):
+                continue
 
-    if not all(
-        column in df.columns
-        for column in needed
-    ):
+        if not rows:
+            raise RuntimeError(f"No usable Kline rows for {symbol} {interval}")
 
+        df = (
+            pd.DataFrame(rows)
+            .drop_duplicates(subset=["Time"])
+            .sort_values("Time")
+            .set_index("Time")
+        )
+        df = df[["Open", "High", "Low", "Close"]].dropna().copy()
+
+        # Ignore the currently forming candle.
+        if len(df) > 1:
+            df = df.iloc[:-1].copy()
+        return df
+    except Exception as error:
+        print(f"Binance Kline request failed: {symbol} {interval}: {error}")
         return None
 
-    df = (
-        df[needed]
-        .dropna()
-        .copy()
-    )
 
-    return df
+_RUN_DATA_CACHE = {}
+_RUN_DATA_CACHE_LOCK = __import__("threading").Lock()
+
+def _cached_download(key, loader):
+    with _RUN_DATA_CACHE_LOCK:
+        if key in _RUN_DATA_CACHE:
+            return _RUN_DATA_CACHE[key]
+    value = loader()
+    with _RUN_DATA_CACHE_LOCK:
+        _RUN_DATA_CACHE[key] = value
+    return value
+
+
+def download_4h(symbol):
+    return _cached_download(("4h", symbol), lambda: _binance_kline(symbol, BINANCE_4H_BARS, "4h"))
 
 
 def download_1d(symbol):
-
-    df = yf.download(
-        symbol,
-        period="2y",
-        interval="1d",
-        auto_adjust=False,
-        progress=False,
-        threads=False,
-    )
-
-    if df is None or df.empty:
-        return None
-
-    if isinstance(df.columns, pd.MultiIndex):
-        df.columns = (
-            df.columns.get_level_values(0)
-        )
-
-    needed = [
-        "Open",
-        "High",
-        "Low",
-        "Close",
-    ]
-
-    if not all(
-        column in df.columns
-        for column in needed
-    ):
-        return None
-
-    df = (
-        df[needed]
-        .dropna()
-        .copy()
-    )
-
-    # فقط کندل‌های کامل روزانه.
-    # آخرین کندل روز جاری ممکن است هنوز بسته نشده باشد.
-    if len(df) > 1:
-        df = df.iloc[:-1].copy()
-
-    return df
+    return _cached_download(("1d", symbol), lambda: _binance_kline(symbol, BINANCE_1D_BARS, "1d"))
 
 
 def latest_daily_order(df):
-
     if df is None or len(df) < 30:
         return None
-
     signals = latest_signals(df)
-
     if not signals:
         return None
-
     return signals[-1]
 
 
@@ -1334,6 +1113,24 @@ def daily_order_matches(
 # =========================================================
 # SIGNAL LOGIC
 # =========================================================
+
+def canonical_side_from_event(direction):
+    """Canonical mapping used by the strategy: bull -> BUY, bear -> SELL."""
+    if direction == "bull":
+        return "BUY"
+    if direction == "bear":
+        return "SELL"
+    return None
+
+
+def canonical_side_from_candidate(direction, candidate_candle):
+    """Validate the event/candidate combination before a signal can be created."""
+    if direction == "bull" and candidate_candle == "BEARISH":
+        return "BUY"
+    if direction == "bear" and candidate_candle == "BULLISH":
+        return "SELL"
+    return None
+
 
 def raw_events(df):
 
@@ -1420,6 +1217,10 @@ def build_signal(
     event_idx,
 ):
 
+    canonical_side = canonical_side_from_event(direction)
+    if canonical_side is None:
+        return None
+
     if direction == "bull":
 
         for offset in range(
@@ -1460,13 +1261,14 @@ def build_signal(
                         f"{idx}|"
                         f"{low:.12f}"
                     ),
-                    "side": "BUY",
+                    "side": canonical_side,
+                    "event_direction": direction,
+                    "candidate_index": idx,
+                    "candidate_candle": "BEARISH",
                     "zone_low": low,
                     "sl": low,
                     "event_index": event_idx,
-                    "event_time": (
-                        event_time.isoformat()
-                    ),
+                    "event_time": event_time.isoformat(),
                 }
 
     else:
@@ -1509,13 +1311,14 @@ def build_signal(
                         f"{idx}|"
                         f"{high:.12f}"
                     ),
-                    "side": "SELL",
+                    "side": canonical_side,
+                    "event_direction": direction,
+                    "candidate_index": idx,
+                    "candidate_candle": "BULLISH",
                     "zone_high": high,
                     "sl": high,
                     "event_index": event_idx,
-                    "event_time": (
-                        event_time.isoformat()
-                    ),
+                    "event_time": event_time.isoformat(),
                 }
 
     return None
@@ -1790,9 +1593,10 @@ def record_equity_point(state, reason=""):
 def allocate_trade(state):
     portfolio = state["portfolio"]
     balance = float(portfolio["balance"])
-    margin = balance * MARGIN_PERCENT / 100.0
+    margin = FIXED_MARGIN
     notional = margin * LEVERAGE
 
+    # Never exceed the configured maximum number of simulated open positions.
     # Always recover a valid unique number, even if an old state file was
     # manually edited or contains a missing/invalid next_trade_number.
     used = []
@@ -1833,7 +1637,6 @@ def close_trade(state, info, active, exit_price, reason, candle_time=None):
         "trade_number": active.get("trade_number"),
         "symbol": info["symbol"],
         "name": info.get("name", info["symbol"]),
-        "rank": info.get("rank"),
         "side": active["side"],
         "signal_id": active["signal_id"],
         "signal_time": active["signal_time"],
@@ -1934,14 +1737,18 @@ def active_trade_details_text(active, info):
 # =========================================================
 
 def signal_text(info, signal, trade_number=None, margin=None, notional=None):
-    entry = float(signal["zone_low"] if signal["side"] == "BUY" else signal["zone_high"])
+    side = canonical_side_from_event(signal.get("event_direction")) or signal.get("side")
+    if side not in ("BUY", "SELL"):
+        raise ValueError(f"Invalid signal side: {side}")
+    if signal.get("side") != side:
+        raise ValueError(f"Signal side mismatch: event={signal.get('event_direction')} side={signal.get('side')}")
+    entry = float(signal["zone_low"] if side == "BUY" else signal["zone_high"])
     lines = [
-        "🟢 سیگنال خرید" if signal["side"] == "BUY" else "🔴 سیگنال فروش",
+        "🟢 سیگنال خرید" if side == "BUY" else "🔴 سیگنال فروش",
         "",
         f"🔢 شماره معامله: #{trade_number}" if trade_number is not None else "🔢 شماره معامله: در حال ثبت",
         f"نماد: {info['symbol']}",
         f"نام: {info['name']}",
-        f"رتبه یاهو: {info['rank']}",
         "تایم‌فریم: 4H",
         "",
         f"📍 ورود: {entry:.12g}",
@@ -1956,7 +1763,7 @@ def signal_text(info, signal, trade_number=None, margin=None, notional=None):
         lines.append(f"{name}: {calculate_tp_price(entry, signal['side'], percent):.12g} (+{percent:g}%)")
     lines += [
         "",
-        f"💰 موجودی مبنا: ${float(margin / (MARGIN_PERCENT / 100.0)):.2f}" if margin is not None else "",
+        f"💰 مارجین ثابت: ${float(margin):.2f}" if margin is not None else "",
         f"زمان: {utc_now()}",
         "",
         TELEGRAM_SIGNATURE,
@@ -2027,8 +1834,13 @@ def check_take_profits(state, info, df):
     active = state["active"].get(info["symbol"])
     if not active or len(df) < 2:
         return
-    high = float(df["High"].iloc[-2])
-    low = float(df["Low"].iloc[-2])
+    # TP is monitored from the newest available candle so the 5-minute
+    # GitHub Actions worker can report an intrabar TP hit without waiting
+    # for the 4H candle to close. Signal generation itself still uses only
+    # completed 4H candles.
+    monitor_idx = -1
+    high = float(df["High"].iloc[monitor_idx])
+    low = float(df["Low"].iloc[monitor_idx])
     try:
         entry = float(active["entry_price"])
         side = active["side"]
@@ -2081,7 +1893,7 @@ def check_take_profits(state, info, df):
         print(f"{info['symbol']}: {tp_name} hit at {tp_price:.12g}; SL -> {new_sl:.12g}")
 
         if tp_name == "TP40":
-            closed = close_trade(state, info, active, tp_price, "FULL TP (TP40)", df.index[-2].isoformat())
+            closed = close_trade(state, info, active, tp_price, "FULL TP (TP40)", df.index[monitor_idx].isoformat())
             print(f"{info['symbol']}: TP40 / Full TP closed trade #{closed.get('trade_number')}")
             return
 
@@ -2094,7 +1906,14 @@ def check_stop(state, info, df):
     active = state["active"].get(info["symbol"])
     if not active or len(df) < 2:
         return
+
+    # User rule: once TP1 has been reached, never send a later SL message
+    # for that signal. Higher TP levels continue to be monitored.
+    if active.get("tp1_hit", False):
+        return
+
     try:
+        # SL is based on the close of a fully completed 4H candle.
         close = float(df["Close"].iloc[-2])
         sl = float(active.get("current_sl", active.get("sl")))
         entry = float(active["entry_price"])
@@ -2333,7 +2152,7 @@ def previous_week_start():
     now = utc_datetime()
     current_week_start = (
         now
-        - pd.Timedelta(days=now.weekday())
+        - pd.Timedelta(days=int(now.weekday()))
     ).replace(
         hour=0,
         minute=0,
@@ -2501,30 +2320,67 @@ def analyze_symbol(state, info, df):
     signals = latest_signals(df)
     if not signals:
         return
-    if not state["initialized"]:
-        latest = signals[-1]
-        state["last_event"][info["symbol"]] = latest["event_time"]
-        state["last_signal"][info["symbol"]] = latest["id"]
+
+    symbol = info["symbol"]
+    latest = signals[-1]
+
+    # HARD DIRECTION CHECK:
+    # bull event + bearish candidate candle = BUY only.
+    # bear event + bullish candidate candle = SELL only.
+    # Never allow a signal side that contradicts its source event/candle.
+    expected_side = canonical_side_from_event(latest.get("event_direction"))
+    expected_candidate_side = canonical_side_from_candidate(
+        latest.get("event_direction"),
+        latest.get("candidate_candle"),
+    )
+    if expected_side is None or expected_candidate_side is None or expected_side != expected_candidate_side:
+        print(
+            f"{symbol}: rejected invalid direction combination "
+            f"event={latest.get('event_direction')} "
+            f"candidate={latest.get('candidate_candle')}"
+        )
+        return
+    if latest.get("side") != expected_side:
+        print(
+            f"{symbol}: rejected inconsistent signal side={latest.get('side')} "
+            f"expected={expected_side}"
+        )
         return
 
-    old_event = state["last_event"].get(info["symbol"])
-    old_signal = state["last_signal"].get(info["symbol"])
-    new_signals = [
-        signal for signal in signals
-        if (not old_event or signal["event_time"] > old_event)
-        and (not old_signal or signal["id"] != old_signal)
-    ]
-    if not new_signals:
+    old_event = state["last_event"].get(symbol)
+    old_signal = state["last_signal"].get(symbol)
+
+    # FIRST TIME THIS SYMBOL IS SEEN: establish a baseline only.
+    # This prevents old/historical signals from being sent after a fresh
+    # state file, after adding a new coin, or after the state is missing
+    # that symbol.
+    if symbol not in state.get("signal_baseline", {}):
+        state.setdefault("signal_baseline", {})[symbol] = latest["event_time"]
+        state["last_event"][symbol] = latest["event_time"]
+        state["last_signal"][symbol] = latest["id"]
+        print(f"{symbol}: baseline set to {latest['event_time']} ({latest['side']}); no old signal sent.")
         return
-    signal = new_signals[-1]
+
+    # Only the latest event after the stored event is eligible.  We never
+    # walk through a backlog of historical signals.
+    if old_event and latest["event_time"] <= old_event:
+        return
+
+    if old_signal and latest["id"] == old_signal:
+        return
+
+    signal = latest
+
+    # Advance the per-symbol cursor BEFORE any filters. This guarantees that
+    # an old signal which fails a filter cannot be re-sent on every run.
+    state["last_event"][symbol] = signal["event_time"]
+    state["last_signal"][symbol] = signal["id"]
 
     # Calculate the OB distance before applying the 4% filter.
     signal = add_ob_distance(signal, df)
     ob_distance = signal_ob_distance_percent(signal)
     if not signal_ob_distance_allowed(signal):
         print(f"{info['symbol']}: signal disabled; OB distance {ob_distance:.2f}% > {MAX_OB_DISTANCE_PERCENT:.2f}%.")
-        state["last_event"][info["symbol"]] = signal["event_time"]
-        state["last_signal"][info["symbol"]] = signal["id"]
         save_state(state)
         return
 
@@ -2532,16 +2388,12 @@ def analyze_symbol(state, info, df):
     daily_signal = latest_daily_order(daily_df)
     if not daily_order_matches(signal, daily_signal):
         print(f"{info['symbol']}: {signal['side']} 4H signal disabled because Daily order is missing/opposite.")
-        state["last_event"][info["symbol"]] = signal["event_time"]
-        state["last_signal"][info["symbol"]] = signal["id"]
         save_state(state)
         return
 
     # One active trade per symbol, preserving the existing state model.
     if info["symbol"] in state["active"]:
         print(f"{info['symbol']}: active trade already exists; new signal ignored.")
-        state["last_event"][info["symbol"]] = signal["event_time"]
-        state["last_signal"][info["symbol"]] = signal["id"]
         save_state(state)
         return
 
@@ -2550,7 +2402,13 @@ def analyze_symbol(state, info, df):
     else:
         entry_price = float(signal["zone_high"])
 
-    trade_number, margin, notional = allocate_trade(state)
+    try:
+        trade_number, margin, notional = allocate_trade(state)
+    except RuntimeError as error:
+        print(f"{info['symbol']}: signal skipped: {error}")
+        save_state(state)
+        return
+
     text = signal_text(info, signal, trade_number, margin, notional)
     # TP1 is the button that reveals TP3 through TP40. TP2 remains visible in the main message.
     reply_markup = {
@@ -2571,7 +2429,6 @@ def analyze_symbol(state, info, df):
         "trade_number": trade_number,
         "symbol": info["symbol"],
         "name": info.get("name", info["symbol"]),
-        "rank": info.get("rank"),
         "signal_id": signal["id"],
         "side": signal["side"],
         "initial_sl": float(signal["sl"]),
@@ -2638,54 +2495,34 @@ def main():
     record_equity_point(state, "heartbeat")
     # Telegram commands are handled by the separate command workflow.
 
-    ranked = get_custom_crypto_symbols()
+    binance_symbols = get_binance_spot_symbols()
 
-    print(
-        f"Loaded {len(ranked)} "
-        "custom symbols from coins.txt"
-    )
+    workers = max(1, min(BINANCE_SCAN_WORKERS, 32))
+    print(f"Binance parallel scan workers: {workers}")
 
-    for info in ranked:
+    results = {}
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        future_map = {executor.submit(download_4h, info["symbol"]): info for info in binance_symbols}
+        for future in as_completed(future_map):
+            info = future_map[future]
+            symbol = info["symbol"]
+            try:
+                results[symbol] = future.result()
+            except Exception as error:
+                results[symbol] = None
+                print(f"{symbol}: ERROR: {error}")
 
-        symbol = info[
-            "symbol"
-        ]
-
+    for info in binance_symbols:
+        symbol = info["symbol"]
+        df = results.get(symbol)
+        if df is None or len(df) < 30:
+            print(f"{symbol}: insufficient data")
+            continue
+        print(f"{symbol} rows={len(df)}")
         try:
-
-            df = download_4h(
-                symbol
-            )
-
-            if (
-                df is None
-                or len(df) < 30
-            ):
-
-                print(
-                    f"{symbol}: "
-                    "insufficient data"
-                )
-
-                continue
-
-            print(
-                f"{symbol} "
-                f"rows={len(df)}"
-            )
-
-            analyze_symbol(
-                state,
-                info,
-                df,
-            )
-
+            analyze_symbol(state, info, df)
         except Exception as error:
-
-            print(
-                f"{symbol}: ERROR: "
-                f"{error}"
-            )
+            print(f"{symbol}: ERROR: {error}")
 
     # گزارش روزانه
     if not state[
@@ -2703,7 +2540,7 @@ def main():
     save_state(state)
 
     print(
-        "Crypto scan completed using custom coins.txt list."
+        "Crypto scan completed."
     )
 
 
