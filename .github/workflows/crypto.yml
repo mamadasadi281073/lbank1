@@ -1,60 +1,60 @@
-name: TradeIQ Binance Crypto Scanner
+```yaml
+name: Crypto TradeIQ Scanner
 
 on:
-  schedule:
-    - cron: "*/5 * * * *"
   workflow_dispatch:
+
+  schedule:
+    # اجرای اسکن هر 4 ساعت
+    - cron: "5 */4 * * *"
 
 permissions:
   contents: write
 
-concurrency:
-  group: tradeiq-crypto-state
-  cancel-in-progress: false
-
 jobs:
-  scan:
+  crypto-scan:
     runs-on: ubuntu-latest
+
     steps:
+      # 1) دریافت فایل‌های ریپو
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Sync latest main
-        run: |
-          git fetch origin main
-          git reset --hard origin/main
-
+      # 2) نصب Python
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: "pip"
-          cache-dependency-path: requirements-crypto.txt
 
-      - name: Install dependencies
+      # 3) نصب کتابخانه‌های لازم
+      - name: Install Python packages
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements-crypto.txt
+          python -m pip install "requests>=2.31,<3" "pandas>=2.2,<3" "yfinance>=0.2.54,<1" numpy
 
-      - name: Run Binance scanner
+      # 4) اجرای ربات
+      - name: Run crypto scanner
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
-          BINANCE_SCAN_WORKERS: "16"
-        run: python crypto_tradeiq.py
+        run: |
+          python crypto_tradeiq.py
 
-      - name: Save trading state
+      # 5) ذخیره signal_state_crypto.json
+      # تا وضعیت سیگنال‌ها، TPها، موجودی و معاملات
+      # بین اجرای بعدی GitHub Actions حفظ شود.
+      - name: Save bot state
         run: |
           git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@github.com"
-          git add kcex_signal_state.json
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add signal_state_crypto.json
+
           if git diff --cached --quiet; then
             echo "No state changes to commit."
-            exit 0
+          else
+            git commit -m "Update crypto scanner state"
+            git push
           fi
-          git commit -m "Update Binance trading state"
-          git pull --rebase origin main
-          git push origin main
+```
