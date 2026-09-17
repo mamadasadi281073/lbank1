@@ -95,9 +95,9 @@
     "BIGTIMEUSDT": "2026-09-17T00:00:00+00:00",
     "FLOWUSDT": "2026-09-17T00:00:00+00:00",
     "C98USDT": "2026-09-17T00:00:00+00:00",
-    "ASTRUSDT": "2026-09-17T08:00:00+00:00",
+    "ASTRUSDT": "2026-09-17T12:00:00+00:00",
     "AUDIOUSDT": "2026-09-16T20:00:00+00:00",
-    "CVCUSDT": "2026-09-17T08:00:00+00:00",
+    "CVCUSDT": "2026-09-17T12:00:00+00:00",
     "ETCUSDT": "2026-09-17T00:00:00+00:00",
     "ANIMEUSDT": "2026-09-17T04:00:00+00:00",
     "AVAUSDT": "2026-09-16T16:00:00+00:00",
@@ -124,7 +124,7 @@
     "ACUUSDT": "2026-09-12T04:00:00+00:00",
     "CUSDT": "2026-09-17T00:00:00+00:00",
     "GUNUSDT": "2026-09-17T00:00:00+00:00",
-    "JSTUSDT": "2026-09-16T00:00:00+00:00",
+    "JSTUSDT": "2026-09-17T12:00:00+00:00",
     "MITOUSDT": "2026-09-17T00:00:00+00:00",
     "EIGENUSDT": "2026-09-17T00:00:00+00:00",
     "INUSDT": "2026-09-11T12:00:00+00:00",
@@ -320,9 +320,9 @@
     "BIGTIMEUSDT": "BUY|2026-09-17T00:00:00+00:00|394|0.007070000000",
     "FLOWUSDT": "BUY|2026-09-17T00:00:00+00:00|394|0.026060000000",
     "C98USDT": "BUY|2026-09-17T00:00:00+00:00|393|0.013420000000",
-    "ASTRUSDT": "BUY|2026-09-17T08:00:00+00:00|393|0.006226000000",
+    "ASTRUSDT": "SELL|2026-09-17T12:00:00+00:00|394|0.006440000000",
     "AUDIOUSDT": "SELL|2026-09-16T20:00:00+00:00|393|0.012540000000",
-    "CVCUSDT": "BUY|2026-09-17T08:00:00+00:00|393|0.025630000000",
+    "CVCUSDT": "SELL|2026-09-17T12:00:00+00:00|394|0.027710000000",
     "ETCUSDT": "BUY|2026-09-17T00:00:00+00:00|393|7.160000000000",
     "ANIMEUSDT": "SELL|2026-09-17T04:00:00+00:00|393|0.002850000000",
     "AVAUSDT": "SELL|2026-09-16T16:00:00+00:00|393|0.160500000000",
@@ -349,7 +349,7 @@
     "ACUUSDT": "BUY|2026-09-12T04:00:00+00:00|393|0.121880000000",
     "CUSDT": "BUY|2026-09-17T00:00:00+00:00|392|0.054300000000",
     "GUNUSDT": "BUY|2026-09-17T00:00:00+00:00|392|0.002490000000",
-    "JSTUSDT": "BUY|2026-09-16T00:00:00+00:00|393|0.114640000000",
+    "JSTUSDT": "BUY|2026-09-17T12:00:00+00:00|393|0.115740000000",
     "MITOUSDT": "BUY|2026-09-17T00:00:00+00:00|394|0.013500000000",
     "EIGENUSDT": "BUY|2026-09-17T00:00:00+00:00|393|0.190300000000",
     "INUSDT": "BUY|2026-09-11T12:00:00+00:00|394|0.030800000000",
@@ -546,7 +546,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T15:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T16:15:00+00:00"
     },
     "BARDUSDT": {
       "trade_number": 80,
@@ -657,7 +657,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T15:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T16:15:00+00:00"
     },
     "ALGOUSDT": {
       "trade_number": 81,
@@ -768,7 +768,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T15:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T16:15:00+00:00"
     },
     "IDUSDT": {
       "trade_number": 82,
@@ -872,7 +872,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T15:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T16:15:00+00:00"
     },
     "KMNOUSDT": {
       "trade_number": 83,
@@ -983,7 +983,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T15:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T16:15:00+00:00"
     },
     "NXPCUSDT": {
       "trade_number": 84,
@@ -1066,7 +1066,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T15:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T16:15:00+00:00"
     },
     "BIGTIMEUSDT": {
       "trade_number": 85,
@@ -1156,7 +1156,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T15:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T16:15:00+00:00"
     },
     "CFGUSDT": {
       "trade_number": 86,
@@ -1267,7 +1267,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T15:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T16:15:00+00:00"
     },
     "JSTUSDT": {
       "trade_number": 87,
@@ -1343,7 +1343,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T15:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T16:15:00+00:00"
     },
     "EULUSDT": {
       "trade_number": 88,
@@ -1426,7 +1426,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T15:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T16:15:00+00:00"
     },
     "ZENUSDT": {
       "trade_number": 89,
@@ -1537,7 +1537,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T15:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T16:15:00+00:00"
     },
     "BANKUSDT": {
       "trade_number": 90,
@@ -1620,7 +1620,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T15:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T16:15:00+00:00"
     },
     "SFPUSDT": {
       "trade_number": 94,
@@ -1696,7 +1696,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T15:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T16:15:00+00:00"
     },
     "SSVUSDT": {
       "trade_number": 95,
@@ -1786,7 +1786,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T15:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T16:15:00+00:00"
     },
     "VETUSDT": {
       "trade_number": 96,
@@ -1795,8 +1795,8 @@
       "signal_id": "BUY|2026-09-17T00:00:00+00:00|391|0.007001000000",
       "side": "BUY",
       "initial_sl": 0.007001,
-      "current_sl": 0.00707101,
-      "sl": 0.00707101,
+      "current_sl": 0.0071410200000000005,
+      "sl": 0.0071410200000000005,
       "entry_price": 0.007001,
       "signal_time": "2026-09-17T00:00:00+00:00",
       "activated_at": "2026-09-17T04:00:40.591096+00:00",
@@ -1806,13 +1806,13 @@
       "tp1_hit": true,
       "tp2_hit": true,
       "tp3_hit": true,
-      "tp4_hit": false,
+      "tp4_hit": true,
       "tp5_hit": false,
       "tp6_hit": false,
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "TP3",
+      "last_tp_hit": "TP4",
       "tp_hits": [
         {
           "name": "TP1",
@@ -1834,6 +1834,13 @@
           "price": 0.00721103,
           "time": "2026-09-17T09:10:00+00:00",
           "new_sl": 0.00707101
+        },
+        {
+          "name": "TP4",
+          "percent": 4.0,
+          "price": 0.007281040000000001,
+          "time": "2026-09-17T16:15:00+00:00",
+          "new_sl": 0.0071410200000000005
         }
       ],
       "balance_at_entry": 100.0,
@@ -1869,7 +1876,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T15:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T16:15:00+00:00"
     },
     "BANDUSDT": {
       "trade_number": 97,
@@ -1952,7 +1959,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T15:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T16:15:00+00:00"
     },
     "MITOUSDT": {
       "trade_number": 98,
@@ -2049,7 +2056,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T15:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T16:15:00+00:00"
     },
     "EIGENUSDT": {
       "trade_number": 99,
@@ -2146,7 +2153,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T15:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T16:15:00+00:00"
     },
     "ANIMEUSDT": {
       "trade_number": 100,
@@ -2222,7 +2229,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T15:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T16:15:00+00:00"
     },
     "WALUSDT": {
       "trade_number": 101,
@@ -2319,7 +2326,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T15:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T16:15:00+00:00"
     },
     "ASTRUSDT": {
       "trade_number": 102,
@@ -2402,7 +2409,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T15:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T16:15:00+00:00"
     },
     "CVCUSDT": {
       "trade_number": 103,
@@ -2492,7 +2499,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T15:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T16:15:00+00:00"
     }
   },
   "closed_trades": [
@@ -3321,6 +3328,10 @@
       "-1002536113120": false
     },
     "TP|CVCUSDT|BUY|2026-09-17T08:00:00+00:00|393|0.025630000000|TP4": {
+      "1448700069": true,
+      "-1002536113120": false
+    },
+    "TP|VETUSDT|BUY|2026-09-17T00:00:00+00:00|391|0.007001000000|TP4": {
       "1448700069": true,
       "-1002536113120": false
     }
@@ -4477,6 +4488,10 @@
     },
     "TP|CVCUSDT|BUY|2026-09-17T08:00:00+00:00|393|0.025630000000|TP4": {
       "text": "🎯 TP4 زده شد\n\n🔢 شماره معامله: #103\nنماد: CVCUSDT\nجهت: BUY\nقیمت هدف: 0.0266552\nهدف: +4%\n🛡 SL جدید: 0.0261426\n\n@Cryptososhiant",
+      "reply_markup": null
+    },
+    "TP|VETUSDT|BUY|2026-09-17T00:00:00+00:00|391|0.007001000000|TP4": {
+      "text": "🎯 TP4 زده شد\n\n🔢 شماره معامله: #96\nنماد: VETUSDT\nجهت: BUY\nقیمت هدف: 0.00728104\nهدف: +4%\n🛡 SL جدید: 0.00714102\n\n@Cryptososhiant",
       "reply_markup": null
     }
   }
