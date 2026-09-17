@@ -92,7 +92,7 @@
     "VETUSDT": "2026-09-17T00:00:00+00:00",
     "MINAUSDT": "2026-09-16T12:00:00+00:00",
     "IDUSDT": "2026-09-17T04:00:00+00:00",
-    "BIGTIMEUSDT": "2026-09-17T00:00:00+00:00",
+    "BIGTIMEUSDT": "2026-09-17T16:00:00+00:00",
     "FLOWUSDT": "2026-09-17T00:00:00+00:00",
     "C98USDT": "2026-09-17T00:00:00+00:00",
     "ASTRUSDT": "2026-09-17T12:00:00+00:00",
@@ -101,7 +101,7 @@
     "ETCUSDT": "2026-09-17T00:00:00+00:00",
     "ANIMEUSDT": "2026-09-17T04:00:00+00:00",
     "AVAUSDT": "2026-09-16T16:00:00+00:00",
-    "NXPCUSDT": "2026-09-17T00:00:00+00:00",
+    "NXPCUSDT": "2026-09-17T16:00:00+00:00",
     "PHAUSDT": "2026-09-17T00:00:00+00:00",
     "RAYUSDT": "2026-09-16T08:00:00+00:00",
     "WCTUSDT": "2026-09-17T00:00:00+00:00",
@@ -317,7 +317,7 @@
     "VETUSDT": "BUY|2026-09-17T00:00:00+00:00|391|0.007001000000",
     "MINAUSDT": "BUY|2026-09-16T12:00:00+00:00|394|0.080300000000",
     "IDUSDT": "SELL|2026-09-17T04:00:00+00:00|393|0.032400000000",
-    "BIGTIMEUSDT": "BUY|2026-09-17T00:00:00+00:00|394|0.007070000000",
+    "BIGTIMEUSDT": "SELL|2026-09-17T16:00:00+00:00|393|0.007290000000",
     "FLOWUSDT": "BUY|2026-09-17T00:00:00+00:00|394|0.026060000000",
     "C98USDT": "BUY|2026-09-17T00:00:00+00:00|393|0.013420000000",
     "ASTRUSDT": "SELL|2026-09-17T12:00:00+00:00|394|0.006440000000",
@@ -326,7 +326,7 @@
     "ETCUSDT": "BUY|2026-09-17T00:00:00+00:00|393|7.160000000000",
     "ANIMEUSDT": "SELL|2026-09-17T04:00:00+00:00|393|0.002850000000",
     "AVAUSDT": "SELL|2026-09-16T16:00:00+00:00|393|0.160500000000",
-    "NXPCUSDT": "BUY|2026-09-17T00:00:00+00:00|393|0.209000000000",
+    "NXPCUSDT": "SELL|2026-09-17T16:00:00+00:00|393|0.212400000000",
     "PHAUSDT": "BUY|2026-09-17T00:00:00+00:00|393|0.026200000000",
     "RAYUSDT": "BUY|2026-09-16T08:00:00+00:00|394|1.193600000000",
     "WCTUSDT": "BUY|2026-09-17T00:00:00+00:00|393|0.034850000000",
@@ -546,7 +546,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T19:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T20:05:00+00:00"
     },
     "BARDUSDT": {
       "trade_number": 80,
@@ -657,7 +657,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T19:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T20:05:00+00:00"
     },
     "ALGOUSDT": {
       "trade_number": 81,
@@ -768,7 +768,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T19:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T20:05:00+00:00"
     },
     "IDUSDT": {
       "trade_number": 82,
@@ -872,7 +872,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T19:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T20:05:00+00:00"
     },
     "KMNOUSDT": {
       "trade_number": 83,
@@ -983,7 +983,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T19:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T20:05:00+00:00"
     },
     "NXPCUSDT": {
       "trade_number": 84,
@@ -1066,7 +1066,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T19:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T20:05:00+00:00"
     },
     "BIGTIMEUSDT": {
       "trade_number": 85,
@@ -1156,7 +1156,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T19:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T20:05:00+00:00"
     },
     "CFGUSDT": {
       "trade_number": 86,
@@ -1267,7 +1267,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T19:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T20:05:00+00:00"
     },
     "JSTUSDT": {
       "trade_number": 87,
@@ -1343,7 +1343,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T19:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T20:05:00+00:00"
     },
     "EULUSDT": {
       "trade_number": 88,
@@ -1426,7 +1426,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T19:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T20:05:00+00:00"
     },
     "ZENUSDT": {
       "trade_number": 89,
@@ -1537,7 +1537,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T19:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T20:05:00+00:00"
     },
     "BANKUSDT": {
       "trade_number": 90,
@@ -1620,7 +1620,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T19:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T20:05:00+00:00"
     },
     "SFPUSDT": {
       "trade_number": 94,
@@ -1724,7 +1724,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T19:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T20:05:00+00:00"
     },
     "SSVUSDT": {
       "trade_number": 95,
@@ -1814,7 +1814,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T19:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T20:05:00+00:00"
     },
     "VETUSDT": {
       "trade_number": 96,
@@ -1911,7 +1911,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T19:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T20:05:00+00:00"
     },
     "BANDUSDT": {
       "trade_number": 97,
@@ -2001,7 +2001,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T19:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T20:05:00+00:00"
     },
     "MITOUSDT": {
       "trade_number": 98,
@@ -2098,7 +2098,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T19:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T20:05:00+00:00"
     },
     "EIGENUSDT": {
       "trade_number": 99,
@@ -2195,7 +2195,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T19:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T20:05:00+00:00"
     },
     "ANIMEUSDT": {
       "trade_number": 100,
@@ -2271,7 +2271,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T19:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T20:05:00+00:00"
     },
     "WALUSDT": {
       "trade_number": 101,
@@ -2368,7 +2368,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T19:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T20:05:00+00:00"
     },
     "ASTRUSDT": {
       "trade_number": 102,
@@ -2451,7 +2451,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T19:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T20:05:00+00:00"
     },
     "CVCUSDT": {
       "trade_number": 103,
@@ -2541,7 +2541,7 @@
       "tp38_hit": false,
       "tp39_hit": false,
       "tp40_hit": false,
-      "tp_last_scan_time": "2026-09-17T19:55:00+00:00"
+      "tp_last_scan_time": "2026-09-17T20:05:00+00:00"
     }
   },
   "closed_trades": [
@@ -3400,6 +3400,10 @@
     "TP|SFPUSDT|BUY|2026-09-17T00:00:00+00:00|393|0.267500000000|TP6": {
       "1448700069": true,
       "-1002536113120": false
+    },
+    "DAILY_REPORT|2026-09-17": {
+      "1448700069": true,
+      "-1002536113120": false
     }
   },
   "daily_stats": {
@@ -3558,7 +3562,7 @@
     ]
   },
   "telegram_update_offset": 0,
-  "last_daily_report": "2026-09-16",
+  "last_daily_report": "2026-09-17",
   "last_monthly_report": "",
   "last_weekly_report": "",
   "signal_baseline": {
@@ -4582,6 +4586,10 @@
     },
     "TP|SFPUSDT|BUY|2026-09-17T00:00:00+00:00|393|0.267500000000|TP6": {
       "text": "🎯 TP6 زده شد\n\n🔢 شماره معامله: #94\nنماد: SFPUSDT\nجهت: BUY\nقیمت هدف: 0.2889\nهدف: +8%\n🛡 SL جدید: 0.2782\n\n@Cryptososhiant",
+      "reply_markup": null
+    },
+    "DAILY_REPORT|2026-09-17": {
+      "text": "📊 گزارش روزانه\n\n📅 تاریخ: 2026-09-17\n\n💰 موجودی ابتدای روز: $100.00\n💰 موجودی فعلی: $100.00\n📈 سود/ضرر روز: +$0.00\n📊 بازده روز: 0.00%\n\n📨 سیگنال‌های امروز: 10\n✅ معاملات بسته‌شده سودده: 0\n❌ معاملات بسته‌شده زیان‌ده: 0\n🏆 بهترین معامله: $+0.00\n💥 بدترین معامله: $+0.00\n📈 بیشترین موجودی ثبت‌شده: $100.00\n📉 Max Drawdown: 0.00%\n📂 معاملات باز: 22\n\n@Cryptososhiant",
       "reply_markup": null
     }
   }
