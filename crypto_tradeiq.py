@@ -1,42 +1,23 @@
 import os
 import re
 import json
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 
 import pandas as pd
 import requests
+import yfinance as yf
 
-STATE_FILE = "kcex_signal_state.json"
+STATE_FILE = "signal_state_crypto.json"
 
-# =========================
-# BINANCE SPOT SOURCE
-# =========================
-# Public market-data only. No Binance account/API key is required.
-# GitHub Actions is used as the execution environment so the scanner does
-# not depend on opening Binance in the user's local browser/network.
-COINS_FILE = os.getenv("COINS_FILE", "coins.txt")
-
-FALLBACK_SOURCE_SYMBOLS = [
-    "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT",
-    "ADAUSDT", "DOGEUSDT", "AVAXUSDT", "LINKUSDT", "DOTUSDT",
-]
-
-BINANCE_SPOT_BASE = os.getenv(
-    "BINANCE_SPOT_BASE",
-    "https://data-api.binance.vision",
-).rstrip("/")
-
-BINANCE_TIMEOUT = int(os.getenv("BINANCE_TIMEOUT", "15"))
-BINANCE_4H_BARS = int(os.getenv("BINANCE_4H_BARS", "400"))
-BINANCE_1D_BARS = int(os.getenv("BINANCE_1D_BARS", "800"))
-BINANCE_SCAN_WORKERS = int(os.getenv("BINANCE_SCAN_WORKERS", "16"))
+RANK_START = int(os.getenv("CRYPTO_RANK_START", "300"))
+RANK_END = int(os.getenv("CRYPTO_RANK_END", "400"))
 
 SENS = 0.28
 MIN_EVENT_SEPARATION = 5
 CANDIDATE_START = 4
 CANDIDATE_END = 15
 
+YAHOO_PAGE_SIZE = 250
 
 # =========================
 # TAKE PROFIT SETTINGS
@@ -56,11 +37,9 @@ TP8_PERCENT = 20.0
 # TP40 is the final / FULL TP.
 
 STARTING_BALANCE = 200.0
-FIXED_MARGIN = 10.0
+MARGIN_PERCENT = 10.0
 LEVERAGE = 10.0
-# Fixed exchange fee charged once when a position is closed.
-# It is deducted on both TP40 (full TP) and SL closes.
-CLOSE_TRADE_FEE = 1.0
+FEE_PER_TRADE = 1.0  # fixed exchange fee charged once when a position closes
 
 # Maximum allowed distance between the signal event close and the
 # selected Order Block boundary. Kept identical to the original filter.
@@ -158,6 +137,7 @@ def load_state():
                 "balance": STARTING_BALANCE,
                 "next_trade_number": 1,
                 "total_realized_pnl": 0.0,
+                "total_fees": 0.0,
                 "period_opening_balances": {},
                 "equity_curve": [],
             },
@@ -193,14 +173,6 @@ def load_state():
 
     state.setdefault(
         "last_signal",
-        {},
-    )
-
-    # Per-symbol bootstrap marker.  A missing marker means we have never
-    # established a baseline for that symbol, so historical signals are
-    # recorded but never sent as new Telegram signals.
-    state.setdefault(
-        "signal_baseline",
         {},
     )
 
@@ -447,7 +419,7 @@ def get_monthly_stats(
 
 def get_week_start(dt):
     # هفته از دوشنبه شروع می‌شود.
-    monday = dt - pd.Timedelta(days=int(dt.weekday()))
+    monday = dt - pd.Timedelta(days=dt.weekday())
     return monday.strftime("%Y-%m-%d")
 
 
@@ -893,210 +865,398 @@ def count_open_monthly_trades(
 
 
 # =========================================================
-# BINANCE SYMBOL RESOLUTION
+# YAHOO CRYPTO RANKING
 # =========================================================
 
-def normalize_requested_symbol(value):
-    value = str(value or "").strip().upper()
-    if not value:
-        return ""
-    value = value.replace("/", "_").replace("-", "_").replace(" ", "")
-    if value.endswith("_USDT"):
-        value = value[:-5]
-    elif value.endswith("USDT"):
-        value = value[:-4]
-    return value
+def yahoo_headers():
 
-
-def read_source_symbols():
-    path = COINS_FILE
-    if os.path.exists(path):
-        rows = []
-        with open(path, "r", encoding="utf-8") as f:
-            for raw in f:
-                raw = raw.strip()
-                if not raw or raw.startswith("#"):
-                    continue
-                rows.append(raw)
-        if rows:
-            print(f"Binance source file: {path} ({len(rows)} requested symbols)")
-            return rows
-
-    print(f"{path} was not found or empty; using embedded fallback list ({len(FALLBACK_SOURCE_SYMBOLS)} symbols).")
-    return list(FALLBACK_SOURCE_SYMBOLS)
-
-
-def binance_json_get(path, params=None):
-    url = BINANCE_SPOT_BASE.rstrip("/") + path
-    headers = {
-        "Accept": "application/json",
-        "User-Agent": "CryptoTradeIQ/1.0",
+    return {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/139.0.0.0 Safari/537.36"
+        ),
+        "Accept": (
+            "application/json,text/plain,*/*"
+        ),
+        "Referer": (
+            "https://finance.yahoo.com/"
+        ),
     }
-    last_error = None
-    for attempt in range(3):
-        try:
-            response = requests.get(
-                url,
-                params=params or {},
-                headers=headers,
-                timeout=BINANCE_TIMEOUT,
-            )
-            response.raise_for_status()
-            payload = response.json()
-            if isinstance(payload, dict) and payload.get("code") not in (None, 0):
-                raise RuntimeError(str(payload))
-            return payload
-        except Exception as error:
-            last_error = error
-            if attempt < 2:
-                import time
-                time.sleep(0.7 * (attempt + 1))
-    raise RuntimeError(f"Binance request failed: {url} | {last_error}")
 
 
-def get_binance_spot_symbols():
-    """Resolve requested coins against Binance Spot USDT markets."""
-    requested = read_source_symbols()
-    requested_bases = []
-    seen = set()
+def request_yahoo_screener(
+    start,
+    count,
+):
 
-    for item in requested:
-        base = normalize_requested_symbol(item)
-        if base and base not in seen:
-            seen.add(base)
-            requested_bases.append(base)
+    url = (
+        "https://query1.finance.yahoo.com/"
+        "v1/finance/screener/predefined/saved"
+    )
 
-    payload = binance_json_get("/api/v3/exchangeInfo")
-    symbols = payload.get("symbols", []) if isinstance(payload, dict) else []
+    params = {
+        "scrIds": (
+            "all_cryptocurrencies_us"
+        ),
+        "count": count,
+        "start": start,
+    }
 
-    symbol_map = {}
-    for item in symbols:
-        if not isinstance(item, dict):
-            continue
-        if item.get("status") != "TRADING":
-            continue
-        if item.get("quoteAsset") != "USDT":
-            continue
-        symbol = str(item.get("symbol") or "").upper()
-        base = str(item.get("baseAsset") or "").upper()
-        if symbol and base:
-            symbol_map.setdefault(base, item)
+    response = requests.get(
+        url,
+        params=params,
+        headers=yahoo_headers(),
+        timeout=30,
+    )
+
+    if response.status_code != 200:
+
+        raise RuntimeError(
+            "Yahoo screener HTTP error: "
+            f"{response.status_code} "
+            f"for start={start}, "
+            f"count={count}. "
+            f"Response: "
+            f"{response.text[:500]}"
+        )
+
+    try:
+
+        data = response.json()
+
+    except Exception as error:
+
+        raise RuntimeError(
+            "Yahoo returned invalid JSON: "
+            f"{error}"
+        )
+
+    finance = data.get(
+        "finance",
+        {},
+    )
+
+    result = finance.get(
+        "result",
+        [],
+    )
+
+    if not result:
+
+        error_info = finance.get(
+            "error"
+        )
+
+        raise RuntimeError(
+            "Yahoo returned no screener "
+            "result. "
+            f"Error: {error_info}"
+        )
+
+    quotes = result[0].get(
+        "quotes",
+        [],
+    )
+
+    if not quotes:
+
+        raise RuntimeError(
+            f"Yahoo returned no quotes "
+            f"for start={start}, "
+            f"count={count}."
+        )
+
+    return quotes
+
+
+def get_ranked_crypto_symbols():
+
+    if RANK_START < 1:
+
+        raise RuntimeError(
+            "CRYPTO_RANK_START must be >= 1."
+        )
+
+    if RANK_END < RANK_START:
+
+        raise RuntimeError(
+            "CRYPTO_RANK_END must be >= "
+            "CRYPTO_RANK_START."
+        )
+
+    required_end = RANK_END
+
+    all_quotes = []
+
+    start = 0
+
+    while len(all_quotes) < required_end:
+
+        remaining = (
+            required_end
+            - len(all_quotes)
+        )
+
+        count = min(
+            YAHOO_PAGE_SIZE,
+            remaining,
+        )
+
+        print(
+            "Requesting Yahoo crypto page: "
+            f"start={start}, "
+            f"count={count}"
+        )
+
+        quotes = request_yahoo_screener(
+            start=start,
+            count=count,
+        )
+
+        if not quotes:
+            break
+
+        previous_count = len(
+            all_quotes
+        )
+
+        all_quotes.extend(
+            quotes
+        )
+
+        print(
+            f"Yahoo returned "
+            f"{len(quotes)} rows "
+            f"for start={start}. "
+            f"Total collected: "
+            f"{len(all_quotes)}"
+        )
+
+        if start > 0:
+
+            previous_symbols = {
+                q.get("symbol")
+                for q in all_quotes[
+                    :previous_count
+                ]
+                if q.get("symbol")
+            }
+
+            current_symbols = {
+                q.get("symbol")
+                for q in quotes
+                if q.get("symbol")
+            }
+
+            if (
+                current_symbols
+                and current_symbols.issubset(
+                    previous_symbols
+                )
+            ):
+
+                raise RuntimeError(
+                    "Yahoo returned the same "
+                    "screener page again "
+                    "instead of advancing "
+                    f"to start={start}."
+                )
+
+        start += len(quotes)
+
+        if len(quotes) < count:
+            break
+
+    if len(all_quotes) < RANK_END:
+
+        raise RuntimeError(
+            "Yahoo did not return enough "
+            "crypto rows. "
+            f"Required through rank "
+            f"{RANK_END}, but only "
+            f"{len(all_quotes)} rows "
+            "were collected."
+        )
 
     rows = []
-    missing = []
-    for base in requested_bases:
-        item = symbol_map.get(base)
-        if not item:
-            missing.append(base)
-            continue
-        rows.append({
-            "symbol": item["symbol"],
-            "name": base,
-            "source_symbol": base + "USDT",
-            "spot_symbol": item["symbol"],
-            "base_currency": base,
-            "clear_currency": "USDT",
-            "price_tick": next((x.get("tickSize") for x in item.get("filters", []) if x.get("filterType") == "PRICE_FILTER"), None),
-            "volume_tick": next((x.get("stepSize") for x in item.get("filters", []) if x.get("filterType") == "LOT_SIZE"), None),
-            "min_order_volume": next((x.get("minQty") for x in item.get("filters", []) if x.get("filterType") == "LOT_SIZE"), None),
-            "min_order_cost": None,
-            "default_leverage": None,
-        })
 
-    order = {base: i for i, base in enumerate(requested_bases)}
-    rows.sort(key=lambda row: order.get(normalize_requested_symbol(row["source_symbol"]), 999999))
+    for position in range(
+        RANK_START - 1,
+        RANK_END,
+    ):
 
-    print(f"Binance requested symbols : {len(requested_bases)}")
-    print(f"Binance Spot matched   : {len(rows)}")
-    print(f"Binance Spot missing   : {len(missing)}")
-    if missing:
-        print("Not listed on Binance Spot: " + ", ".join(missing))
+        q = all_quotes[position]
 
-    if not rows:
-        raise RuntimeError("None of the requested coins are currently available on Binance Spot.")
+        symbol = q.get(
+            "symbol"
+        )
+
+        if not symbol:
+
+            raise RuntimeError(
+                f"Yahoo rank "
+                f"{position + 1} "
+                "has no symbol."
+            )
+
+        name = (
+            q.get("longName")
+            or q.get("shortName")
+            or symbol
+        )
+
+        rows.append(
+            {
+                "symbol": symbol,
+                "name": name,
+                "rank": position + 1,
+            }
+        )
+
+    expected_count = (
+        RANK_END
+        - RANK_START
+        + 1
+    )
+
+    if len(rows) != expected_count:
+
+        raise RuntimeError(
+            "Yahoo rank extraction "
+            "failed. "
+            f"Expected {expected_count} "
+            f"rows, got {len(rows)}."
+        )
+
+    print(
+        "Yahoo ranks loaded correctly: "
+        f"{RANK_START}-{RANK_END} "
+        f"({len(rows)} symbols)"
+    )
+
+    print(
+        "First selected rank: "
+        f"{rows[0]['rank']} "
+        f"{rows[0]['symbol']}"
+    )
+
+    print(
+        "Last selected rank: "
+        f"{rows[-1]['rank']} "
+        f"{rows[-1]['symbol']}"
+    )
+
     return rows
 
 
 # =========================================================
-# BINANCE KLINE DATA
+# YAHOO 4H DATA
 # =========================================================
 
-def _binance_kline(symbol, size, interval):
-    requested_size = min(int(size), 1500)
-    try:
-        payload = binance_json_get(
-            "/api/v3/klines",
-            {
-                "symbol": symbol,
-                "interval": interval,
-                "limit": requested_size,
-            },
-        )
-        if not isinstance(payload, list) or not payload:
-            raise RuntimeError(f"Empty Kline response for {symbol} {interval}")
+def download_4h(symbol):
 
-        rows = []
-        for item in payload:
-            if not isinstance(item, (list, tuple)) or len(item) < 6:
-                continue
-            try:
-                rows.append({
-                    "Time": pd.to_datetime(int(item[0]), unit="ms", utc=True),
-                    "Open": float(item[1]),
-                    "High": float(item[2]),
-                    "Low": float(item[3]),
-                    "Close": float(item[4]),
-                })
-            except (TypeError, ValueError):
-                continue
+    df = yf.download(
+        symbol,
+        period="60d",
+        interval="4h",
+        auto_adjust=False,
+        progress=False,
+        threads=False,
+    )
 
-        if not rows:
-            raise RuntimeError(f"No usable Kline rows for {symbol} {interval}")
-
-        df = (
-            pd.DataFrame(rows)
-            .drop_duplicates(subset=["Time"])
-            .sort_values("Time")
-            .set_index("Time")
-        )
-        df = df[["Open", "High", "Low", "Close"]].dropna().copy()
-
-        # Ignore the currently forming candle.
-        if len(df) > 1:
-            df = df.iloc[:-1].copy()
-        return df
-    except Exception as error:
-        print(f"Binance Kline request failed: {symbol} {interval}: {error}")
+    if df is None or df.empty:
         return None
 
+    if isinstance(
+        df.columns,
+        pd.MultiIndex,
+    ):
 
-_RUN_DATA_CACHE = {}
-_RUN_DATA_CACHE_LOCK = __import__("threading").Lock()
+        df.columns = (
+            df.columns
+            .get_level_values(0)
+        )
 
-def _cached_download(key, loader):
-    with _RUN_DATA_CACHE_LOCK:
-        if key in _RUN_DATA_CACHE:
-            return _RUN_DATA_CACHE[key]
-    value = loader()
-    with _RUN_DATA_CACHE_LOCK:
-        _RUN_DATA_CACHE[key] = value
-    return value
+    needed = [
+        "Open",
+        "High",
+        "Low",
+        "Close",
+    ]
 
+    if not all(
+        column in df.columns
+        for column in needed
+    ):
 
-def download_4h(symbol):
-    return _cached_download(("4h", symbol), lambda: _binance_kline(symbol, BINANCE_4H_BARS, "4h"))
+        return None
+
+    df = (
+        df[needed]
+        .dropna()
+        .copy()
+    )
+
+    return df
 
 
 def download_1d(symbol):
-    return _cached_download(("1d", symbol), lambda: _binance_kline(symbol, BINANCE_1D_BARS, "1d"))
+
+    df = yf.download(
+        symbol,
+        period="2y",
+        interval="1d",
+        auto_adjust=False,
+        progress=False,
+        threads=False,
+    )
+
+    if df is None or df.empty:
+        return None
+
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = (
+            df.columns.get_level_values(0)
+        )
+
+    needed = [
+        "Open",
+        "High",
+        "Low",
+        "Close",
+    ]
+
+    if not all(
+        column in df.columns
+        for column in needed
+    ):
+        return None
+
+    df = (
+        df[needed]
+        .dropna()
+        .copy()
+    )
+
+    # فقط کندل‌های کامل روزانه.
+    # آخرین کندل روز جاری ممکن است هنوز بسته نشده باشد.
+    if len(df) > 1:
+        df = df.iloc[:-1].copy()
+
+    return df
 
 
 def latest_daily_order(df):
+
     if df is None or len(df) < 30:
         return None
+
     signals = latest_signals(df)
+
     if not signals:
         return None
+
     return signals[-1]
 
 
@@ -1117,24 +1277,6 @@ def daily_order_matches(
 # =========================================================
 # SIGNAL LOGIC
 # =========================================================
-
-def canonical_side_from_event(direction):
-    """Canonical mapping used by the strategy: bull -> BUY, bear -> SELL."""
-    if direction == "bull":
-        return "BUY"
-    if direction == "bear":
-        return "SELL"
-    return None
-
-
-def canonical_side_from_candidate(direction, candidate_candle):
-    """Validate the event/candidate combination before a signal can be created."""
-    if direction == "bull" and candidate_candle == "BEARISH":
-        return "BUY"
-    if direction == "bear" and candidate_candle == "BULLISH":
-        return "SELL"
-    return None
-
 
 def raw_events(df):
 
@@ -1221,10 +1363,6 @@ def build_signal(
     event_idx,
 ):
 
-    canonical_side = canonical_side_from_event(direction)
-    if canonical_side is None:
-        return None
-
     if direction == "bull":
 
         for offset in range(
@@ -1265,14 +1403,13 @@ def build_signal(
                         f"{idx}|"
                         f"{low:.12f}"
                     ),
-                    "side": canonical_side,
-                    "event_direction": direction,
-                    "candidate_index": idx,
-                    "candidate_candle": "BEARISH",
+                    "side": "BUY",
                     "zone_low": low,
                     "sl": low,
                     "event_index": event_idx,
-                    "event_time": event_time.isoformat(),
+                    "event_time": (
+                        event_time.isoformat()
+                    ),
                 }
 
     else:
@@ -1315,14 +1452,13 @@ def build_signal(
                         f"{idx}|"
                         f"{high:.12f}"
                     ),
-                    "side": canonical_side,
-                    "event_direction": direction,
-                    "candidate_index": idx,
-                    "candidate_candle": "BULLISH",
+                    "side": "SELL",
                     "zone_high": high,
                     "sl": high,
                     "event_index": event_idx,
-                    "event_time": event_time.isoformat(),
+                    "event_time": (
+                        event_time.isoformat()
+                    ),
                 }
 
     return None
@@ -1597,10 +1733,9 @@ def record_equity_point(state, reason=""):
 def allocate_trade(state):
     portfolio = state["portfolio"]
     balance = float(portfolio["balance"])
-    margin = FIXED_MARGIN
+    margin = balance * MARGIN_PERCENT / 100.0
     notional = margin * LEVERAGE
 
-    # Never exceed the configured maximum number of simulated open positions.
     # Always recover a valid unique number, even if an old state file was
     # manually edited or contains a missing/invalid next_trade_number.
     used = []
@@ -1627,41 +1762,25 @@ def allocate_trade(state):
 
 
 def close_trade(state, info, active, exit_price, reason, candle_time=None):
-    """Close a position, apply PnL to the real balance, and charge one fee.
-
-    The fee is charged exactly once per closed position, regardless of whether
-    the position closes at TP40 or at the current/trailing SL.
-    """
     entry = float(active["entry_price"])
     notional = float(active.get("notional", 0.0))
     gross_pnl = trade_pnl(entry, float(exit_price), active["side"], notional)
-
-    # Fixed exchange fee: one dollar per closed position.
-    fee = float(CLOSE_TRADE_FEE)
+    fee = float(FEE_PER_TRADE)
     net_pnl = gross_pnl - fee
 
     portfolio = state["portfolio"]
     balance_before = float(portfolio["balance"])
     balance_after = balance_before + net_pnl
-
-    # THIS is the real account balance used by all future trades/reports.
     portfolio["balance"] = balance_after
-    portfolio["total_realized_pnl"] = (
-        float(portfolio.get("total_realized_pnl", 0.0)) + net_pnl
-    )
-    portfolio["total_fees"] = (
-        float(portfolio.get("total_fees", 0.0)) + fee
-    )
-
-    record_equity_point(
-        state,
-        f"trade #{active.get('trade_number')} {reason}",
-    )
+    portfolio["total_realized_pnl"] = float(portfolio.get("total_realized_pnl", 0.0)) + net_pnl
+    portfolio["total_fees"] = float(portfolio.get("total_fees", 0.0)) + fee
+    record_equity_point(state, f"trade #{active.get('trade_number')} {reason}")
 
     closed = {
         "trade_number": active.get("trade_number"),
         "symbol": info["symbol"],
         "name": info.get("name", info["symbol"]),
+        "rank": info.get("rank"),
         "side": active["side"],
         "signal_id": active["signal_id"],
         "signal_time": active["signal_time"],
@@ -1688,11 +1807,13 @@ def close_trade(state, info, active, exit_price, reason, candle_time=None):
     state["closed_trades"].append(closed)
 
     signal_time = active["signal_time"]
-    if net_pnl > 1e-12:
+    # Classification is based on the trade result before the fixed fee, so a
+    # profitable TP is not turned into an SL just because the fee is $1.
+    if gross_pnl > 1e-12:
         register_daily_tp(state, active["signal_id"], signal_time)
         register_monthly_tp(state, active["signal_id"], signal_time)
         register_weekly_tp(state, active["signal_id"], signal_time)
-    elif net_pnl < -1e-12:
+    else:
         register_daily_sl(state, active["signal_id"], signal_time)
         register_monthly_sl(state, active["signal_id"], signal_time)
         register_weekly_sl(state, active["signal_id"], signal_time)
@@ -1703,16 +1824,12 @@ def close_trade(state, info, active, exit_price, reason, candle_time=None):
 
 
 def trade_details_text(trade, title="📋 جزئیات معامله"):
-    net_pnl = float(trade.get("pnl", 0.0))
-    gross_pnl = float(trade.get("gross_pnl", net_pnl))
-    fee = float(trade.get("fee", CLOSE_TRADE_FEE))
-    balance_before = float(trade.get("balance_before", 0.0))
+    pnl = float(trade.get("pnl", 0.0))
     balance = float(trade.get("balance_after", 0.0))
-    gross_sign = "+" if gross_pnl >= 0 else ""
-    net_sign = "+" if net_pnl >= 0 else ""
+    sign = "+" if pnl >= 0 else ""
     return (
         f"{title}\n\n"
-        f"🔢 شماره معامله: #{trade.get('trade_number')}\n"
+        f"🔢 شناسه معامله: #TRD-{int(trade.get('trade_number', 0)):04d}\n"
         f"نماد: {trade.get('symbol')}\n"
         f"جهت: {trade.get('side')}\n"
         f"ورود: {float(trade.get('entry_price', 0)):.12g}\n"
@@ -1723,12 +1840,11 @@ def trade_details_text(trade, title="📋 جزئیات معامله"):
         f"SL اولیه: {float(trade.get('initial_sl', 0)):.12g}\n"
         f"SL فعلی: {float(trade.get('current_sl', trade.get('initial_sl', 0))):.12g}\n"
         f"آخرین TP: {trade.get('last_tp_hit') or 'هیچ‌کدام'}\n"
-        f"نتیجه: {trade.get('reason')}\n\n"
-        f"📈 سود/ضرر ناخالص: {gross_sign}${gross_pnl:.2f}\n"
-        f"💳 کارمزد صرافی: -${fee:.2f}\n"
-        f"💰 سود/ضرر خالص: {net_sign}${net_pnl:.2f}\n\n"
-        f"💵 موجودی قبل معامله: ${balance_before:.2f}\n"
-        f"💵 موجودی بعد معامله: ${balance:.2f}\n\n"
+        f"نتیجه: {trade.get('reason')}\n"
+        f"سود/ضرر ناخالص: {"+" if float(trade.get("gross_pnl", pnl)) >= 0 else ""}${float(trade.get("gross_pnl", pnl)):.2f}\n"
+        f"کارمزد: -${float(trade.get("fee", FEE_PER_TRADE)):.2f}\n"
+        f"سود/ضرر خالص: {sign}${pnl:.2f}\n"
+        f"موجودی کل بعد معامله: ${balance:.2f}\n\n"
         f"{TELEGRAM_SIGNATURE}"
     )
 
@@ -1737,7 +1853,7 @@ def active_trade_details_text(active, info):
     lines = [
         "📋 جزئیات معامله فعال",
         "",
-        f"🔢 شماره معامله: #{active.get('trade_number')}",
+        f"🔢 شناسه معامله: #TRD-{int(active.get('trade_number', 0)):04d}",
         f"نماد: {info.get('symbol')}",
         f"نام: {info.get('name', info.get('symbol'))}",
         f"جهت: {active.get('side')}",
@@ -1771,75 +1887,118 @@ def active_trade_details_text(active, info):
 # =========================================================
 
 def signal_text(info, signal, trade_number=None, margin=None, notional=None):
-    side = canonical_side_from_event(signal.get("event_direction")) or signal.get("side")
-    if side not in ("BUY", "SELL"):
-        raise ValueError(f"Invalid signal side: {side}")
-    if signal.get("side") != side:
-        raise ValueError(f"Signal side mismatch: event={signal.get('event_direction')} side={signal.get('side')}")
-    entry = float(signal["zone_low"] if side == "BUY" else signal["zone_high"])
+    entry = float(signal["zone_low"] if signal["side"] == "BUY" else signal["zone_high"])
+    side_label = "BUY / خرید" if signal["side"] == "BUY" else "SELL / فروش"
+    levels = tp_levels()
     lines = [
-        "🟢 سیگنال خرید" if side == "BUY" else "🔴 سیگنال فروش",
+        "🚨 سیگنال جدید کریپتو",
+        "━━━━━━━━━━━━━━━━",
+        f"📌 نوع معامله: {side_label}",
+        f"🔢 شناسه معامله: #TRD-{int(trade_number):04d}" if trade_number is not None else "🔢 شناسه معامله: در حال ثبت",
+        f"🪙 نماد: {info['symbol']}",
+        f"🏷 نام: {info['name']}",
+        f"📊 رتبه یاهو: {info['rank']}",
+        "⏱ تایم‌فریم: 4H",
         "",
-        f"🔢 شماره معامله: #{trade_number}" if trade_number is not None else "🔢 شماره معامله: در حال ثبت",
-        f"نماد: {info['symbol']}",
-        f"نام: {info['name']}",
-        "تایم‌فریم: 4H",
-        "",
-        f"📍 ورود: {entry:.12g}",
-        f"🛑 SL اولیه: {float(signal['sl']):.12g}",
+        f"📍 نقطه ورود: {entry:.12g}",
+        f"🛑 حد ضرر اولیه: {float(signal['sl']):.12g}",
     ]
     if margin is not None and notional is not None:
         lines += [f"💵 مارجین: ${margin:.2f}", f"📊 ارزش پوزیشن: ${notional:.2f}", f"⚡ اهرم: {LEVERAGE:g}x"]
-    lines += ["", "🎯 اهداف:"]
-    # فقط TP1 و TP2 در پیام اصلی نمایش داده می‌شوند.
-    levels = tp_levels()
+    lines += ["", "🎯 اهداف اولیه:"]
     for name, percent in levels[:2]:
         lines.append(f"{name}: {calculate_tp_price(entry, signal['side'], percent):.12g} (+{percent:g}%)")
     lines += [
         "",
-        f"💰 مارجین ثابت: ${float(margin):.2f}" if margin is not None else "",
-        f"زمان: {utc_now()}",
+        "📈 مدیریت معامله: بعد از فعال شدن هر TP، حد ضرر طبق پلن به‌روزرسانی می‌شود.",
+        "🔒 سودهای قفل‌شده در پیام‌های TP نمایش داده می‌شوند.",
+        f"💰 بالانس هنگام ورود: ${float(margin / (MARGIN_PERCENT / 100.0)):.2f}" if margin is not None else "",
+        f"🕐 زمان سیگنال: {utc_now()}",
         "",
         TELEGRAM_SIGNATURE,
     ]
     return "\n".join(lines)
 
 
-
 # =========================================================
 # STOP LOSS MESSAGE
 # =========================================================
 
-def stop_text(info, active, exit_price=None, pnl=None):
-    sign = "+" if pnl is not None and pnl >= 0 else ""
-    pnl_line = f"سود/ضرر ناخالص: {sign}${pnl:.2f}" if pnl is not None else ""
-    fee_line = f"کارمزد صرافی: -${CLOSE_TRADE_FEE:.2f}" if pnl is not None else ""
+def stop_text(info, active, exit_price=None, pnl=None, fee=None, balance_after=None, gross_pnl=None):
+    net = pnl if pnl is not None else 0.0
+    gross = gross_pnl if gross_pnl is not None else net
+    fee_value = FEE_PER_TRADE if fee is None else fee
+    sign_net = "+" if net >= 0 else ""
+    sign_gross = "+" if gross >= 0 else ""
     return (
-        "🛑 معامله بسته شد روی SL\n\n"
-        f"🔢 شماره معامله: #{active.get('trade_number')}\n"
-        f"نماد: {info['symbol']}\n"
-        f"جهت: {active['side']}\n"
-        f"ورود: {float(active['entry_price']):.12g}\n"
-        f"SL فعال: {float(active.get('current_sl', active.get('sl'))):.12g}\n"
-        + (f"خروج: {float(exit_price):.12g}\n" if exit_price is not None else "")
-        + (pnl_line + "\n" if pnl is not None else "")
-        + (fee_line + "\n" if pnl is not None else "")
-        + (f"سود/ضرر خالص: ${pnl - CLOSE_TRADE_FEE:+.2f}\n" if pnl is not None else "")
+        "🛑 معامله بسته شد\n"
+        "━━━━━━━━━━━━━━━━\n\n"
+        f"🔢 شناسه معامله: #TRD-{int(active.get('trade_number', 0)):04d}\n"
+        f"🪙 نماد: {info['symbol']}\n"
+        f"📌 جهت: {active['side']}\n"
+        f"📍 ورود: {float(active['entry_price']):.12g}\n"
+        f"🛡 SL فعال: {float(active.get('current_sl', active.get('sl'))):.12g}\n"
+        + (f"🚪 خروج: {float(exit_price):.12g}\n" if exit_price is not None else "")
+        + f"📊 سود/ضرر ناخالص: {sign_gross}${gross:.2f}\n"
+        + f"💸 کارمزد صرافی: -${float(fee_value):.2f}\n"
+        + f"💰 سود/ضرر خالص: {sign_net}${net:.2f}\n"
+        + (f"🏦 بالانس کل بعد از بسته‌شدن: ${float(balance_after):.2f}\n" if balance_after is not None else "")
         + f"\n{TELEGRAM_SIGNATURE}"
     )
 
 
-def tp_text(info, active, tp_name, tp_percent, tp_price, new_sl):
-    return (
-        f"🎯 {tp_name} زده شد\n\n"
-        f"🔢 شماره معامله: #{active.get('trade_number')}\n"
-        f"نماد: {info['symbol']}\n"
-        f"جهت: {active['side']}\n"
-        f"قیمت هدف: {tp_price:.12g}\n"
-        f"هدف: +{tp_percent:g}%\n"
-        f"🛡 SL جدید: {new_sl:.12g}\n\n"
-        f"{TELEGRAM_SIGNATURE}"
-    )
+def tp_progress_bar(active, current_tp_name=None):
+    total = len(tp_levels_for_side(active.get("side", "BUY")))
+    hit_count = sum(1 for name, percent in tp_levels_for_side(active.get("side", "BUY")) if percent is not None and active.get(tp_hit_key(name), False))
+    if current_tp_name and not active.get(tp_hit_key(current_tp_name), False):
+        hit_count += 1
+    filled = min(10, int(round((hit_count / max(total, 1)) * 10)))
+    return "█" * filled + "░" * (10 - filled), hit_count, total
+
+
+def profit_lock_text(entry, side, new_sl):
+    entry = float(entry)
+    new_sl = float(new_sl)
+    if side == "BUY":
+        locked = (new_sl - entry) / entry * 100.0
+    else:
+        locked = (entry - new_sl) / entry * 100.0
+    if locked > 1e-9:
+        return f"🔒 سود قفل‌شده: +{locked:.2f}%"
+    if abs(locked) <= 1e-9:
+        return "🔒 حد ضرر روی نقطه ورود قرار گرفت؛ ریسک قیمت قفل شد."
+    return "🛡 حد ضرر هنوز داخل ناحیه اولیه معامله است."
+
+
+def tp_text(info, active, tp_name, tp_percent, tp_price, new_sl, balance_after=None, closed=False, gross_pnl=None, fee=None, net_pnl=None):
+    bar, hit_count, total = tp_progress_bar(active, tp_name)
+    lines = [
+        f"🎯 {tp_name} فعال شد",
+        "━━━━━━━━━━━━━━━━",
+        f"🔢 شناسه معامله: #TRD-{int(active.get('trade_number', 0)):04d}",
+        f"🪙 نماد: {info['symbol']}",
+        f"📌 جهت: {active['side']}",
+        f"💵 قیمت هدف: {tp_price:.12g}",
+        f"📈 هدف: +{tp_percent:g}%",
+        f"🎯 پیشرفت: {bar}  {hit_count}/{total}",
+        f"🛡 SL جدید: {new_sl:.12g}",
+        profit_lock_text(active.get('entry_price', 0), active['side'], new_sl),
+    ]
+    if closed:
+        gross = float(gross_pnl or 0.0)
+        fee_value = FEE_PER_TRADE if fee is None else float(fee)
+        net = float(net_pnl if net_pnl is not None else gross - fee_value)
+        lines += [
+            "",
+            "🏁 معامله نهایی شد",
+            f"📊 سود/ضرر ناخالص: {'+' if gross >= 0 else ''}${gross:.2f}",
+            f"💸 کارمزد صرافی: -${fee_value:.2f}",
+            f"💰 سود/ضرر خالص: {'+' if net >= 0 else ''}${net:.2f}",
+        ]
+        if balance_after is not None:
+            lines.append(f"🏦 بالانس کل بعد از بسته‌شدن: ${float(balance_after):.2f}")
+    lines += ["", TELEGRAM_SIGNATURE]
+    return "\n".join(lines)
 
 
 def calculate_tp_price(
@@ -1871,13 +2030,8 @@ def check_take_profits(state, info, df):
     active = state["active"].get(info["symbol"])
     if not active or len(df) < 2:
         return
-    # TP is monitored from the newest available candle so the 5-minute
-    # GitHub Actions worker can report an intrabar TP hit without waiting
-    # for the 4H candle to close. Signal generation itself still uses only
-    # completed 4H candles.
-    monitor_idx = -1
-    high = float(df["High"].iloc[monitor_idx])
-    low = float(df["Low"].iloc[monitor_idx])
+    high = float(df["High"].iloc[-2])
+    low = float(df["Low"].iloc[-2])
     try:
         entry = float(active["entry_price"])
         side = active["side"]
@@ -1888,34 +2042,38 @@ def check_take_profits(state, info, df):
 
     for index, (tp_name, tp_percent) in enumerate(levels):
         hit_key = tp_hit_key(tp_name)
-        if active.get(hit_key, False):
-            continue
-        if tp_percent is None:
+        if active.get(hit_key, False) or tp_percent is None:
             continue
         tp_price = calculate_tp_price(entry, side, tp_percent)
         hit = high >= tp_price if side == "BUY" else low <= tp_price
         if not hit:
             continue
 
-        # Trailing rule:
-        # TP1 keeps original SL.
-        # TP2 moves SL to entry.
-        # TP3-TP8 move SL two TP levels back (old behavior).
-        # From TP9 onward SL moves to the immediately previous TP.
-        # TP40 is the final / FULL TP and closes the trade.
+        # همان منطق قبلی: TP1=SL اولیه، TP2=ورود، TP3-TP8 دو TP عقب،
+        # و از TP9 به بعد SL روی TP قبلی قرار می‌گیرد.
         if index == 0:
             new_sl = float(active.get("current_sl", active.get("initial_sl", active["sl"])))
         elif index == 1:
             new_sl = entry
         elif index >= 8:
-            previous_name, previous_percent = levels[index - 1]
+            _, previous_percent = levels[index - 1]
             new_sl = calculate_tp_price(entry, side, previous_percent)
         else:
-            previous_name, previous_percent = levels[index - 2]
+            _, previous_percent = levels[index - 2]
             new_sl = calculate_tp_price(entry, side, previous_percent)
 
+        is_final = tp_name == "TP40"
+        gross_pnl = trade_pnl(entry, tp_price, side, float(active.get("notional", 0.0))) if is_final else 0.0
+        fee = float(FEE_PER_TRADE) if is_final else 0.0
+        net_pnl = gross_pnl - fee if is_final else 0.0
+        balance_after = float(state["portfolio"]["balance"]) + net_pnl if is_final else None
+
         delivery_key = f"TP|{info['symbol']}|{active['signal_id']}|{tp_name}"
-        text = tp_text(info, active, tp_name, tp_percent, tp_price, new_sl)
+        text = tp_text(
+            info, active, tp_name, tp_percent, tp_price, new_sl,
+            balance_after=balance_after, closed=is_final,
+            gross_pnl=gross_pnl, fee=fee, net_pnl=net_pnl,
+        )
         if not deliver_once(state, delivery_key, text):
             save_state(state)
             return
@@ -1929,9 +2087,9 @@ def check_take_profits(state, info, df):
 
         print(f"{info['symbol']}: {tp_name} hit at {tp_price:.12g}; SL -> {new_sl:.12g}")
 
-        if tp_name == "TP40":
-            closed = close_trade(state, info, active, tp_price, "FULL TP (TP40)", df.index[monitor_idx].isoformat())
-            print(f"{info['symbol']}: TP40 / Full TP closed trade #{closed.get('trade_number')}")
+        if is_final:
+            closed = close_trade(state, info, active, tp_price, "FULL TP (TP40)", df.index[-2].isoformat())
+            print(f"{info['symbol']}: TP40 / Full TP closed trade #{closed.get('trade_number')} | balance=${closed.get('balance_after', 0):.2f}")
             return
 
 
@@ -1943,12 +2101,9 @@ def check_stop(state, info, df):
     active = state["active"].get(info["symbol"])
     if not active or len(df) < 2:
         return
-
     try:
-        # SL is based on the close of a fully completed 4H candle.
         close = float(df["Close"].iloc[-2])
         sl = float(active.get("current_sl", active.get("sl")))
-        entry = float(active["entry_price"])
     except (KeyError, TypeError, ValueError):
         print(f"{info['symbol']}: active trade has incomplete pricing data; skipping SL check.")
         return
@@ -1957,14 +2112,16 @@ def check_stop(state, info, df):
         return
     candle_time = df.index[-2].isoformat()
     delivery_key = f"STOP|{info['symbol']}|{active['signal_id']}|{candle_time}|{sl:.12g}"
-    # PnL is calculated once, after the stop notification is successfully delivered.
-    pnl = trade_pnl(float(active["entry_price"]), sl, active["side"], float(active.get("notional", 0.0)))
-    text = stop_text(info, active, sl, pnl)
+    gross_pnl = trade_pnl(float(active["entry_price"]), sl, active["side"], float(active.get("notional", 0.0)))
+    fee = float(FEE_PER_TRADE)
+    net_pnl = gross_pnl - fee
+    balance_after = float(state["portfolio"]["balance"]) + net_pnl
+    text = stop_text(info, active, sl, net_pnl, fee=fee, balance_after=balance_after, gross_pnl=gross_pnl)
     if not deliver_once(state, delivery_key, text):
         save_state(state)
         return
-    close_trade(state, info, active, sl, "TRAILING SL" if active.get("last_tp_hit") else "INITIAL SL", candle_time)
-    print(f"Stop loss sent for {info['symbol']} trade #{active.get('trade_number')}")
+    closed = close_trade(state, info, active, sl, "TRAILING SL" if active.get("last_tp_hit") else "INITIAL SL", candle_time)
+    print(f"Stop loss sent for {info['symbol']} trade #{active.get('trade_number')} | balance=${closed.get('balance_after', 0):.2f}")
 
 
 def portfolio_metrics(state):
@@ -1987,28 +2144,41 @@ def portfolio_metrics(state):
 
 def daily_report_text(state, report_date):
     stats = get_daily_stats(state, report_date)
-    opening = float(state["portfolio"].get("period_opening_balances", {}).get(f"DAY|{report_date}", state["portfolio"]["initial_balance"]))
-    closing = float(state["portfolio"]["balance"])
-    pnl = closing - opening
+    portfolio = state["portfolio"]
+    # این مقدار عمداً در لحظه ساخت گزارش از state خوانده می‌شود؛ بنابراین
+    # «بالانس فعلی» همیشه آخرین بالانس ثبت‌شده تا همان لحظه است.
+    current_balance = float(portfolio.get("balance", STARTING_BALANCE))
+    opening = float(portfolio.get("period_opening_balances", {}).get(f"DAY|{report_date}", portfolio.get("initial_balance", STARTING_BALANCE)))
+    pnl = current_balance - opening
     closed = [t for t in state.get("closed_trades", []) if str(t.get("exit_time", "")).startswith(report_date)]
-    wins = sum(1 for t in closed if float(t.get("pnl", 0)) > 0)
-    losses = sum(1 for t in closed if float(t.get("pnl", 0)) < 0)
+    wins = sum(1 for t in closed if float(t.get("gross_pnl", t.get("pnl", 0))) > 0)
+    losses = sum(1 for t in closed if float(t.get("gross_pnl", t.get("pnl", 0))) <= 0)
+    fees = sum(float(t.get("fee", 0.0)) for t in closed)
     best = max((float(t.get("pnl", 0)) for t in closed), default=0.0)
     worst = min((float(t.get("pnl", 0)) for t in closed), default=0.0)
     peak, drawdown = portfolio_metrics(state)
-    return (f"📊 گزارش روزانه\n\n📅 تاریخ: {report_date}\n\n"
-            f"💰 موجودی ابتدای روز: ${opening:.2f}\n"
-            f"💰 موجودی فعلی: ${closing:.2f}\n"
-            f"📈 سود/ضرر روز: {'+' if pnl >= 0 else ''}${pnl:.2f}\n"
-            f"📊 بازده روز: {(pnl/opening*100 if opening else 0):.2f}%\n\n"
-            f"📨 سیگنال‌های امروز: {int(stats.get('signals',0))}\n"
-            f"✅ معاملات بسته‌شده سودده: {wins}\n"
-            f"❌ معاملات بسته‌شده زیان‌ده: {losses}\n"
-            f"🏆 بهترین معامله: ${best:+.2f}\n"
-            f"💥 بدترین معامله: ${worst:+.2f}\n"
-            f"📈 بیشترین موجودی ثبت‌شده: ${peak:.2f}\n"
-            f"📉 Max Drawdown: {drawdown:.2f}%\n"
-            f"📂 معاملات باز: {len(state.get('active',{}))}\n\n{TELEGRAM_SIGNATURE}")
+    total_closed = len(closed)
+    win_rate = (wins / total_closed * 100.0) if total_closed else 0.0
+    return (
+        f"📊 گزارش روزانه\n"
+        f"━━━━━━━━━━━━━━━━\n\n"
+        f"📅 تاریخ: {report_date}\n\n"
+        f"💰 موجودی ابتدای روز: ${opening:.2f}\n"
+        f"🏦 بالانس دقیق لحظه گزارش: ${current_balance:.2f}\n"
+        f"📈 سود/ضرر روز: {'+' if pnl >= 0 else ''}${pnl:.2f}\n"
+        f"📊 بازده روز: {(pnl/opening*100 if opening else 0):.2f}%\n"
+        f"💸 کارمزدهای امروز: -${fees:.2f}\n\n"
+        f"📨 سیگنال‌های امروز: {int(stats.get('signals', 0))}\n"
+        f"✅ معاملات سودده: {wins}\n"
+        f"❌ معاملات زیان‌ده: {losses}\n"
+        f"🎯 Win Rate: {win_rate:.2f}%\n"
+        f"📂 معاملات باز: {len(state.get('active', {}))}\n"
+        f"🏆 بهترین معامله: ${best:+.2f}\n"
+        f"💥 بدترین معامله: ${worst:+.2f}\n"
+        f"📈 بیشترین موجودی ثبت‌شده: ${peak:.2f}\n"
+        f"📉 Max Drawdown: {drawdown:.2f}%\n\n"
+        f"{TELEGRAM_SIGNATURE}"
+    )
 
 
 def should_send_daily_report():
@@ -2072,24 +2242,34 @@ def send_daily_report(
 # =========================================================
 
 def monthly_report_text(state, month_string):
-    opening = float(state["portfolio"].get("period_opening_balances", {}).get(f"MONTH|{month_string}", state["portfolio"]["initial_balance"]))
+    portfolio = state["portfolio"]
+    opening = float(portfolio.get("period_opening_balances", {}).get(f"MONTH|{month_string}", portfolio.get("initial_balance", STARTING_BALANCE)))
     trades = [t for t in state.get("closed_trades", []) if str(t.get("exit_time", "")).startswith(month_string)]
-    pnl = sum(float(t.get("pnl",0)) for t in trades)
+    pnl = sum(float(t.get("pnl", 0)) for t in trades)
     closing = opening + pnl
-    wins = sum(1 for t in trades if float(t.get("pnl",0)) > 0)
-    losses = sum(1 for t in trades if float(t.get("pnl",0)) < 0)
+    wins = sum(1 for t in trades if float(t.get("gross_pnl", t.get("pnl", 0))) > 0)
+    losses = sum(1 for t in trades if float(t.get("gross_pnl", t.get("pnl", 0))) <= 0)
+    fees = sum(float(t.get("fee", 0.0)) for t in trades)
     best = max((float(t.get("pnl", 0)) for t in trades), default=0.0)
     worst = min((float(t.get("pnl", 0)) for t in trades), default=0.0)
-    peak, drawdown = portfolio_metrics(state)
-    return (f"📊 گزارش ماهانه\n\n📅 ماه: {month_string}\n\n"
-            f"💰 موجودی ابتدای ماه: ${opening:.2f}\n"
-            f"💰 موجودی پایان ماه: ${closing:.2f}\n"
-            f"📈 سود/ضرر ماه: {'+' if pnl >= 0 else ''}${pnl:.2f}\n"
-            f"📊 بازده ماه: {(pnl/opening*100 if opening else 0):.2f}%\n\n"
-            f"📊 معاملات بسته‌شده: {len(trades)}\n"
-            f"✅ سودده: {wins}\n❌ زیان‌ده: {losses}\n"
-            f"🏆 بهترین معامله: ${best:+.2f}\n💥 بدترین معامله: ${worst:+.2f}\n"
-            f"📈 بیشترین موجودی: ${peak:.2f}\n📉 Max Drawdown: {drawdown:.2f}%\n\n{TELEGRAM_SIGNATURE}")
+    win_rate = (wins / len(trades) * 100.0) if trades else 0.0
+    return (
+        f"📊 گزارش ماهانه\n"
+        f"━━━━━━━━━━━━━━━━\n\n"
+        f"📅 ماه: {month_string}\n\n"
+        f"💰 موجودی ابتدای ماه: ${opening:.2f}\n"
+        f"🏦 موجودی پایان ماه: ${closing:.2f}\n"
+        f"📈 سود/ضرر خالص ماه: {'+' if pnl >= 0 else ''}${pnl:.2f}\n"
+        f"📊 بازده ماه: {(pnl/opening*100 if opening else 0):.2f}%\n"
+        f"💸 مجموع کارمزدها: -${fees:.2f}\n\n"
+        f"📊 معاملات بسته‌شده: {len(trades)}\n"
+        f"✅ سودده: {wins}\n"
+        f"❌ زیان‌ده: {losses}\n"
+        f"🎯 Win Rate: {win_rate:.2f}%\n"
+        f"🏆 بهترین معامله: ${best:+.2f}\n"
+        f"💥 بدترین معامله: ${worst:+.2f}\n\n"
+        f"{TELEGRAM_SIGNATURE}"
+    )
 
 
 def should_send_monthly_report():
@@ -2184,7 +2364,7 @@ def previous_week_start():
     now = utc_datetime()
     current_week_start = (
         now
-        - pd.Timedelta(days=int(now.weekday()))
+        - pd.Timedelta(days=now.weekday())
     ).replace(
         hour=0,
         minute=0,
@@ -2352,67 +2532,30 @@ def analyze_symbol(state, info, df):
     signals = latest_signals(df)
     if not signals:
         return
-
-    symbol = info["symbol"]
-    latest = signals[-1]
-
-    # HARD DIRECTION CHECK:
-    # bull event + bearish candidate candle = BUY only.
-    # bear event + bullish candidate candle = SELL only.
-    # Never allow a signal side that contradicts its source event/candle.
-    expected_side = canonical_side_from_event(latest.get("event_direction"))
-    expected_candidate_side = canonical_side_from_candidate(
-        latest.get("event_direction"),
-        latest.get("candidate_candle"),
-    )
-    if expected_side is None or expected_candidate_side is None or expected_side != expected_candidate_side:
-        print(
-            f"{symbol}: rejected invalid direction combination "
-            f"event={latest.get('event_direction')} "
-            f"candidate={latest.get('candidate_candle')}"
-        )
-        return
-    if latest.get("side") != expected_side:
-        print(
-            f"{symbol}: rejected inconsistent signal side={latest.get('side')} "
-            f"expected={expected_side}"
-        )
+    if not state["initialized"]:
+        latest = signals[-1]
+        state["last_event"][info["symbol"]] = latest["event_time"]
+        state["last_signal"][info["symbol"]] = latest["id"]
         return
 
-    old_event = state["last_event"].get(symbol)
-    old_signal = state["last_signal"].get(symbol)
-
-    # FIRST TIME THIS SYMBOL IS SEEN: establish a baseline only.
-    # This prevents old/historical signals from being sent after a fresh
-    # state file, after adding a new coin, or after the state is missing
-    # that symbol.
-    if symbol not in state.get("signal_baseline", {}):
-        state.setdefault("signal_baseline", {})[symbol] = latest["event_time"]
-        state["last_event"][symbol] = latest["event_time"]
-        state["last_signal"][symbol] = latest["id"]
-        print(f"{symbol}: baseline set to {latest['event_time']} ({latest['side']}); no old signal sent.")
+    old_event = state["last_event"].get(info["symbol"])
+    old_signal = state["last_signal"].get(info["symbol"])
+    new_signals = [
+        signal for signal in signals
+        if (not old_event or signal["event_time"] > old_event)
+        and (not old_signal or signal["id"] != old_signal)
+    ]
+    if not new_signals:
         return
-
-    # Only the latest event after the stored event is eligible.  We never
-    # walk through a backlog of historical signals.
-    if old_event and latest["event_time"] <= old_event:
-        return
-
-    if old_signal and latest["id"] == old_signal:
-        return
-
-    signal = latest
-
-    # Advance the per-symbol cursor BEFORE any filters. This guarantees that
-    # an old signal which fails a filter cannot be re-sent on every run.
-    state["last_event"][symbol] = signal["event_time"]
-    state["last_signal"][symbol] = signal["id"]
+    signal = new_signals[-1]
 
     # Calculate the OB distance before applying the 4% filter.
     signal = add_ob_distance(signal, df)
     ob_distance = signal_ob_distance_percent(signal)
     if not signal_ob_distance_allowed(signal):
         print(f"{info['symbol']}: signal disabled; OB distance {ob_distance:.2f}% > {MAX_OB_DISTANCE_PERCENT:.2f}%.")
+        state["last_event"][info["symbol"]] = signal["event_time"]
+        state["last_signal"][info["symbol"]] = signal["id"]
         save_state(state)
         return
 
@@ -2420,12 +2563,16 @@ def analyze_symbol(state, info, df):
     daily_signal = latest_daily_order(daily_df)
     if not daily_order_matches(signal, daily_signal):
         print(f"{info['symbol']}: {signal['side']} 4H signal disabled because Daily order is missing/opposite.")
+        state["last_event"][info["symbol"]] = signal["event_time"]
+        state["last_signal"][info["symbol"]] = signal["id"]
         save_state(state)
         return
 
     # One active trade per symbol, preserving the existing state model.
     if info["symbol"] in state["active"]:
         print(f"{info['symbol']}: active trade already exists; new signal ignored.")
+        state["last_event"][info["symbol"]] = signal["event_time"]
+        state["last_signal"][info["symbol"]] = signal["id"]
         save_state(state)
         return
 
@@ -2434,13 +2581,7 @@ def analyze_symbol(state, info, df):
     else:
         entry_price = float(signal["zone_high"])
 
-    try:
-        trade_number, margin, notional = allocate_trade(state)
-    except RuntimeError as error:
-        print(f"{info['symbol']}: signal skipped: {error}")
-        save_state(state)
-        return
-
+    trade_number, margin, notional = allocate_trade(state)
     text = signal_text(info, signal, trade_number, margin, notional)
     # TP1 is the button that reveals TP3 through TP40. TP2 remains visible in the main message.
     reply_markup = {
@@ -2461,6 +2602,7 @@ def analyze_symbol(state, info, df):
         "trade_number": trade_number,
         "symbol": info["symbol"],
         "name": info.get("name", info["symbol"]),
+        "rank": info.get("rank"),
         "signal_id": signal["id"],
         "side": signal["side"],
         "initial_sl": float(signal["sl"]),
@@ -2527,34 +2669,59 @@ def main():
     record_equity_point(state, "heartbeat")
     # Telegram commands are handled by the separate command workflow.
 
-    binance_symbols = get_binance_spot_symbols()
+    ranked = (
+        get_ranked_crypto_symbols()
+    )
 
-    workers = max(1, min(BINANCE_SCAN_WORKERS, 32))
-    print(f"Binance parallel scan workers: {workers}")
+    print(
+        f"Loaded {len(ranked)} "
+        "Yahoo crypto symbols, "
+        f"ranks {RANK_START}-"
+        f"{RANK_END}"
+    )
 
-    results = {}
-    with ThreadPoolExecutor(max_workers=workers) as executor:
-        future_map = {executor.submit(download_4h, info["symbol"]): info for info in binance_symbols}
-        for future in as_completed(future_map):
-            info = future_map[future]
-            symbol = info["symbol"]
-            try:
-                results[symbol] = future.result()
-            except Exception as error:
-                results[symbol] = None
-                print(f"{symbol}: ERROR: {error}")
+    for info in ranked:
 
-    for info in binance_symbols:
-        symbol = info["symbol"]
-        df = results.get(symbol)
-        if df is None or len(df) < 30:
-            print(f"{symbol}: insufficient data")
-            continue
-        print(f"{symbol} rows={len(df)}")
+        symbol = info[
+            "symbol"
+        ]
+
         try:
-            analyze_symbol(state, info, df)
+
+            df = download_4h(
+                symbol
+            )
+
+            if (
+                df is None
+                or len(df) < 30
+            ):
+
+                print(
+                    f"{symbol}: "
+                    "insufficient data"
+                )
+
+                continue
+
+            print(
+                f"{symbol} "
+                f"rank={info['rank']} "
+                f"rows={len(df)}"
+            )
+
+            analyze_symbol(
+                state,
+                info,
+                df,
+            )
+
         except Exception as error:
-            print(f"{symbol}: ERROR: {error}")
+
+            print(
+                f"{symbol}: ERROR: "
+                f"{error}"
+            )
 
     # گزارش روزانه
     if not state[
