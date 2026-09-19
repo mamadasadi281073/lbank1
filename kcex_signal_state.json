@@ -5755,5 +5755,9 @@
       "reply_markup": null
     }
   },
-  "last_signal_scan_candle": "2026-09-19T08:00:00+00:00"
+  "last_signal_scan_candle": "2026-09-19T08:00:00+00:00",
+  "market_boss": {
+    "current": null,
+    "power_history": []
+  }
 }
