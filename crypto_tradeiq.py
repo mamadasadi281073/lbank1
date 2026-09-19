@@ -1079,6 +1079,20 @@ def _cached_download(key, loader):
     return value
 
 
+def get_current_price(symbol):
+    """Return the latest Binance Spot price for a symbol."""
+    try:
+        payload = binance_json_get(
+            "/api/v3/ticker/price",
+            {"symbol": symbol},
+        )
+        price = float(payload["price"])
+        return price if price > 0 else None
+    except Exception as error:
+        print(f"Current price failed: {symbol}: {error}")
+        return None
+
+
 def download_4h(symbol):
     return _cached_download(("4h", symbol), lambda: _binance_kline(symbol, BINANCE_4H_BARS, "4h"))
 
@@ -1838,17 +1852,22 @@ def calculate_tp_price(
 # TAKE PROFIT CHECK
 # =========================================================
 
-def check_take_profits(state, info, df):
+def check_take_profits(state, info, df=None, current_price=None):
     active = state["active"].get(info["symbol"])
-    if not active or len(df) < 2:
+    if not active:
         return
-    # TP is monitored from the newest available candle so the 5-minute
-    # GitHub Actions worker can report an intrabar TP hit without waiting
-    # for the 4H candle to close. Signal generation itself still uses only
-    # completed 4H candles.
-    monitor_idx = -1
-    high = float(df["High"].iloc[monitor_idx])
-    low = float(df["Low"].iloc[monitor_idx])
+
+    # TP is monitored from the current Binance Spot price. This function is
+    # called by the 5-minute GitHub Actions worker, so TP detection no longer
+    # waits for a 4H candle to close. Signal generation remains 4H-only.
+    if current_price is None:
+        if df is None or len(df) < 2:
+            return
+        current_price = float(df["Close"].iloc[-1])
+
+    high = float(current_price)
+    low = float(current_price)
+    monitor_time = utc_now()
     try:
         entry = float(active["entry_price"])
         side = active["side"]
@@ -1901,7 +1920,7 @@ def check_take_profits(state, info, df):
         print(f"{info['symbol']}: {tp_name} hit at {tp_price:.12g}; SL -> {new_sl:.12g}")
 
         if tp_name == "TP40":
-            closed = close_trade(state, info, active, tp_price, "FULL TP (TP40)", df.index[monitor_idx].isoformat())
+            closed = close_trade(state, info, active, tp_price, "FULL TP (TP40)", monitor_time)
             print(f"{info['symbol']}: TP40 / Full TP closed trade #{closed.get('trade_number')}")
             return
 
@@ -2392,9 +2411,8 @@ def get_latest_btc_order():
 # =========================================================
 
 def analyze_symbol(state, info, df, btc_master_signal=None):
-    check_take_profits(state, info, df)
-    check_stop(state, info, df)
-
+    # Trade monitoring is handled separately every 5 minutes. This function
+    # is only for NEW 4H signal generation.
     signals = latest_signals(df)
     if not signals:
         return
@@ -2593,6 +2611,55 @@ def find_trade(state, number):
 
 
 # =========================================================
+# 5-MINUTE ACTIVE TRADE MONITOR
+# =========================================================
+
+def monitor_active_trades(state):
+    """Monitor every open trade on every workflow run.
+
+    TP uses the live Binance Spot price. Initial/trailing SL uses the close of
+    the latest completed 4H candle, matching the strategy rule.
+    """
+    active_symbols = list(state.get("active", {}).keys())
+    if not active_symbols:
+        return
+
+    print(f"Active trade monitor: {len(active_symbols)} open trade(s)")
+
+    def load_monitor_data(symbol):
+        return symbol, get_current_price(symbol), download_4h(symbol)
+
+    workers = max(1, min(BINANCE_SCAN_WORKERS, 16))
+    results = {}
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = [executor.submit(load_monitor_data, symbol) for symbol in active_symbols]
+        for future in as_completed(futures):
+            symbol, price, df = future.result()
+            results[symbol] = (price, df)
+
+    # Process sequentially because all operations mutate the shared state.
+    for symbol in active_symbols:
+        if symbol not in state.get("active", {}):
+            continue
+        price, df = results.get(symbol, (None, None))
+        info = {"symbol": symbol}
+
+        try:
+            if price is not None:
+                check_take_profits(state, info, df=df, current_price=price)
+            else:
+                print(f"{symbol}: live price unavailable; TP check skipped.")
+
+            # If TP40 closed the trade, there is no SL check to perform.
+            if symbol in state.get("active", {}) and df is not None:
+                check_stop(state, info, df)
+        except Exception as error:
+            print(f"{symbol}: active trade monitor ERROR: {error}")
+
+    save_state(state)
+
+
+# =========================================================
 # MAIN
 # =========================================================
 
@@ -2603,65 +2670,93 @@ def main():
     record_equity_point(state, "heartbeat")
     # Telegram commands are handled by the separate command workflow.
 
-    binance_symbols = get_binance_spot_symbols()
+    # =====================================================
+    # ALWAYS-ON 5-MINUTE TRADE MANAGEMENT
+    # =====================================================
+    # This runs on every workflow invocation, even when there is no new 4H
+    # candle. TP uses live price; SL uses the latest completed 4H close.
+    monitor_active_trades(state)
 
     # =====================================================
-    # BTC MASTER ORDER
+    # 4H NEW-SIGNAL SCAN
     # =====================================================
-    # BTC determines the allowed direction for NEW orders.
-    btc_master_signal = get_latest_btc_order()
+    # Binance 4H candles are aligned to 00/04/08/12/16/20 UTC. The scanner
+    # only performs the expensive all-coin signal scan when a new completed
+    # 4H candle appears. This prevents generating/processing signals every
+    # five minutes while still allowing active trades to be managed every 5m.
+    btc_df = download_4h(BTC_REFERENCE_SYMBOL)
+    btc_master_signal = None
+    new_4h_candle = False
 
-    if btc_master_signal is None:
+    if btc_df is not None and len(btc_df) >= 30:
+        latest_candle = btc_df.index[-1].isoformat()
+        last_scan = str(state.get("last_signal_scan_candle", ""))
+        new_4h_candle = latest_candle != last_scan
+        btc_signals = latest_signals(btc_df)
+        if btc_signals:
+            btc_master_signal = btc_signals[-1]
+
         print(
-            "BTC MASTER ORDER unavailable. "
-            "No new coin signals will be sent in this run."
+            f"BTC MASTER ORDER: {btc_master_signal.get('side') if btc_master_signal else 'NONE'} | "
+            f"latest completed 4H candle={latest_candle} | new_scan={new_4h_candle}"
         )
+    else:
+        print("BTC MASTER: insufficient BTC 4H data.")
 
-    workers = max(1, min(BINANCE_SCAN_WORKERS, 32))
-    print(f"Binance parallel scan workers: {workers}")
+    if new_4h_candle and btc_master_signal is not None:
+        binance_symbols = get_binance_spot_symbols()
+        workers = max(1, min(BINANCE_SCAN_WORKERS, 32))
+        print(f"NEW 4H CANDLE -> full signal scan; workers={workers}")
 
-    results = {}
-    with ThreadPoolExecutor(max_workers=workers) as executor:
-        future_map = {executor.submit(download_4h, info["symbol"]): info for info in binance_symbols}
-        for future in as_completed(future_map):
-            info = future_map[future]
+        results = {}
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            future_map = {
+                executor.submit(download_4h, info["symbol"]): info
+                for info in binance_symbols
+                if info["symbol"] != BTC_REFERENCE_SYMBOL
+            }
+            for future in as_completed(future_map):
+                info = future_map[future]
+                symbol = info["symbol"]
+                try:
+                    results[symbol] = future.result()
+                except Exception as error:
+                    results[symbol] = None
+                    print(f"{symbol}: ERROR: {error}")
+
+        for info in binance_symbols:
             symbol = info["symbol"]
+            if symbol == BTC_REFERENCE_SYMBOL:
+                continue
+            df = results.get(symbol)
+            if df is None or len(df) < 30:
+                print(f"{symbol}: insufficient data")
+                continue
             try:
-                results[symbol] = future.result()
+                analyze_symbol(
+                    state,
+                    info,
+                    df,
+                    btc_master_signal=btc_master_signal,
+                )
             except Exception as error:
-                results[symbol] = None
                 print(f"{symbol}: ERROR: {error}")
 
-    for info in binance_symbols:
-        symbol = info["symbol"]
-        df = results.get(symbol)
-        if df is None or len(df) < 30:
-            print(f"{symbol}: insufficient data")
-            continue
-        print(f"{symbol} rows={len(df)}")
-        try:
-            analyze_symbol(state, info, df, btc_master_signal=btc_master_signal)
-        except Exception as error:
-            print(f"{symbol}: ERROR: {error}")
+        state["last_signal_scan_candle"] = btc_df.index[-1].isoformat()
+        save_state(state)
+    else:
+        if btc_master_signal is None:
+            print("BTC MASTER ORDER unavailable; no new 4H coin signals will be sent.")
+        else:
+            print("No new completed 4H candle; signal scan skipped. Active trades were monitored.")
 
-    # گزارش روزانه
-    if not state[
-        "initialized"
-    ]:
-
-        state[
-            "initialized"
-        ] = True
-
+    # Reports run independently of the 4H signal scan.
     send_daily_report(state)
     send_monthly_report(state)
     send_weekly_report(state)
 
     save_state(state)
-
-    print(
-        "Crypto scan completed."
-    )
+    print("Crypto scan/5-minute trade-management run completed.")
 
 
 if __name__ == "__main__":
