@@ -1629,9 +1629,6 @@ def close_trade(state, info, active, exit_price, reason, candle_time=None):
     portfolio = state["portfolio"]
     balance_before = float(portfolio["balance"])
     balance_after = balance_before + pnl
-
-    # Realized PnL is applied immediately when a position closes.
-    # This is the single source of truth for the portfolio balance.
     portfolio["balance"] = float(balance_after)
     portfolio["total_realized_pnl"] = (
         float(portfolio.get("total_realized_pnl", 0.0)) + float(pnl)
@@ -1904,40 +1901,8 @@ def check_take_profits(state, info, df):
         print(f"{info['symbol']}: {tp_name} hit at {tp_price:.12g}; SL -> {new_sl:.12g}")
 
         if tp_name == "TP40":
-            closed = close_trade(
-                state,
-                info,
-                active,
-                tp_price,
-                "FULL TP (TP40)",
-                df.index[monitor_idx].isoformat(),
-            )
-
-            # The TP40 notification was already delivered above. Send a
-            # separate one-time close confirmation containing the actual
-            # post-PnL balance, so the channel always shows the new balance.
-            close_delivery_key = (
-                f"CLOSE_BALANCE|{info['symbol']}|"
-                f"{active['signal_id']}|TP40"
-            )
-            close_text = (
-                "🏁 معامله کامل بسته شد\n\n"
-                f"🔢 شماره معامله: #{closed.get('trade_number')}\n"
-                f"نماد: {info['symbol']}\n"
-                f"جهت: {closed.get('side')}\n"
-                f"خروج نهایی: {float(closed.get('exit_price', tp_price)):.12g}\n"
-                f"PnL: {'+' if float(closed.get('pnl', 0)) >= 0 else ''}"
-                f"${float(closed.get('pnl', 0)):.2f}\n"
-                f"💰 موجودی جدید: ${float(closed.get('balance_after', state['portfolio']['balance'])):.2f}\n\n"
-                f"{TELEGRAM_SIGNATURE}"
-            )
-            deliver_once(state, close_delivery_key, close_text)
-            save_state(state)
-            print(
-                f"{info['symbol']}: TP40 / Full TP closed trade "
-                f"#{closed.get('trade_number')} | "
-                f"balance=${float(closed.get('balance_after', 0)):.2f}"
-            )
+            closed = close_trade(state, info, active, tp_price, "FULL TP (TP40)", df.index[monitor_idx].isoformat())
+            print(f"{info['symbol']}: TP40 / Full TP closed trade #{closed.get('trade_number')}")
             return
 
 
@@ -1968,8 +1933,7 @@ def check_stop(state, info, df):
         return
     candle_time = df.index[-2].isoformat()
     delivery_key = f"STOP|{info['symbol']}|{active['signal_id']}|{candle_time}|{sl:.12g}"
-    # Calculate PnL and the exact post-close balance before sending the
-    # notification. The balance is then persisted by close_trade().
+    # Calculate the PnL and resulting balance before sending the close message.
     pnl = trade_pnl(
         float(active["entry_price"]),
         sl,
@@ -2000,7 +1964,6 @@ def check_stop(state, info, df):
         candle_time,
     )
 
-    # Explicitly persist the final portfolio state after closing.
     state["portfolio"]["balance"] = float(closed["balance_after"])
     save_state(state)
 
@@ -2396,7 +2359,7 @@ BTC_REFERENCE_SYMBOL = "BTCUSDT"
 def get_latest_btc_order():
     """
     آخرین Order معتبر BTCUSDT در تایم‌فریم 4H را پیدا می‌کند.
-    فقط جهت آخرین Order بیت‌کوین برای فیلتر سیگنال‌های جدید استفاده می‌شود.
+    جهت آن Master Direction برای سیگنال‌های جدید سایر ارزهاست.
     """
     btc_df = download_4h(BTC_REFERENCE_SYMBOL)
 
@@ -2405,7 +2368,6 @@ def get_latest_btc_order():
         return None
 
     btc_signals = latest_signals(btc_df)
-
     if not btc_signals:
         print("BTC MASTER: no BTC order found.")
         return None
@@ -2419,11 +2381,9 @@ def get_latest_btc_order():
 
     print(
         "BTC MASTER ORDER: "
-        f"{side} | "
-        f"time={latest_btc.get('event_time')} | "
+        f"{side} | time={latest_btc.get('event_time')} | "
         f"id={latest_btc.get('id')}"
     )
-
     return latest_btc
 
 
@@ -2497,11 +2457,10 @@ def analyze_symbol(state, info, df, btc_master_signal=None):
     # =====================================================
     # BTC MASTER DIRECTION FILTER
     # =====================================================
-    # The signal must be NEW for this symbol AND have the same
-    # direction as the latest completed BTC 4H order.
-    #
-    # The per-symbol cursor is advanced BEFORE this filter, so
-    # an opposite-direction signal is not retried on every run.
+    # Only NEW orders aligned with the latest BTC 4H order
+    # are eligible for Telegram delivery. The symbol cursor
+    # has already advanced, so rejected opposite signals are
+    # not retried on every workflow run.
 
     if btc_master_signal is None:
         print(
@@ -2649,9 +2608,7 @@ def main():
     # =====================================================
     # BTC MASTER ORDER
     # =====================================================
-    # BTC is checked independently because it is the master
-    # direction for all new signals. If BTC cannot be resolved,
-    # no new coin signal is sent during this run.
+    # BTC determines the allowed direction for NEW orders.
     btc_master_signal = get_latest_btc_order()
 
     if btc_master_signal is None:
