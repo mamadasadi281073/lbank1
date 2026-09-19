@@ -58,11 +58,7 @@ TP8_PERCENT = 20.0
 STARTING_BALANCE = 200.0
 TRADE_MARGIN_PERCENT = 5.0
 LEVERAGE = 10.0
-POWER_EMA_FAST = 20
-POWER_EMA_SLOW = 50
-POWER_ATR_PERIOD = 14
-POWER_VOLUME_PERIOD = 20
-POWER_HISTORY_LIMIT = 100
+INITIAL_SL_PERCENT = 10.0
 
 # Maximum allowed distance between the signal event close and the
 # selected Order Block boundary. Kept identical to the original filter.
@@ -241,7 +237,6 @@ def load_state():
         "",
     )
 
-    state.setdefault("market_boss", {"current": None, "power_history": []})
     state.setdefault("closed_trades", [])
     portfolio = state.setdefault("portfolio", {})
     portfolio.setdefault("initial_balance", STARTING_BALANCE)
@@ -449,7 +444,7 @@ def get_monthly_stats(
 
 def get_week_start(dt):
     # هفته از دوشنبه شروع می‌شود.
-    monday = dt - pd.Timedelta(days=int(dt.weekday()))
+    monday = dt - pd.Timedelta(days=int(dt.weekday()), unit="D")
     return monday.strftime("%Y-%m-%d")
 
 
@@ -1048,6 +1043,7 @@ def _binance_kline(symbol, size, interval):
                     "High": float(item[2]),
                     "Low": float(item[3]),
                     "Close": float(item[4]),
+                    "Volume": float(item[5]),
                 })
             except (TypeError, ValueError):
                 continue
@@ -1061,7 +1057,7 @@ def _binance_kline(symbol, size, interval):
             .sort_values("Time")
             .set_index("Time")
         )
-        df = df[["Open", "High", "Low", "Close"]].dropna().copy()
+        df = df[["Open", "High", "Low", "Close", "Volume"]].dropna().copy()
 
         # Ignore the currently forming candle.
         if len(df) > 1:
@@ -1114,144 +1110,6 @@ def daily_order_matches(
         four_hour_signal["side"]
         == daily_signal["side"]
     )
-
-
-# =========================================================
-# BTC MARKET BOSS / POWER
-# =========================================================
-
-def _clamp(value, low=0.0, high=100.0):
-    return max(low, min(high, float(value)))
-
-
-def btc_power_score(df):
-    """Calculate a deterministic 0-100 BTC market-strength score from 4H data.
-
-    Components: strategy direction/structure (25), momentum (20), volume (20),
-    ATR expansion (15), EMA alignment (10), latest closed-candle confirmation (10).
-    The current still-forming 4H candle is excluded when possible.
-    """
-    if df is None or len(df) < 60:
-        return None
-    d = df.copy().sort_index()
-    # Binance klines normally include the current candle; exclude it by timestamp
-    # if it is newer than the most recent fully completed 4H boundary.
-    now = pd.Timestamp.now(tz="UTC")
-    if getattr(d.index, "tz", None) is None:
-        idx = pd.to_datetime(d.index, utc=True)
-    else:
-        idx = d.index
-    d = d.copy()
-    d.index = idx
-    boundary = now.floor("4h")
-    d = d[d.index < boundary]
-    if len(d) < 60:
-        return None
-
-    close = d["Close"].astype(float)
-    open_ = d["Open"].astype(float)
-    high = d["High"].astype(float)
-    low = d["Low"].astype(float)
-    volume = d["Volume"].astype(float)
-
-    # 1) Strategy/event component: reward the latest strategy direction and
-    # magnitude of the latest 4H move, capped to avoid dominating the score.
-    latest = latest_signals(d)
-    strategy_side = latest[-1]["side"] if latest else None
-    ret4 = (close.iloc[-1] / close.iloc[-5] - 1.0) * 100.0
-    momentum_side = "BUY" if ret4 > 0 else "SELL" if ret4 < 0 else None
-    alignment = 1.0 if strategy_side and strategy_side == momentum_side else 0.0
-    structure = 12.5 if strategy_side else 7.5
-    structure += 12.5 * alignment
-
-    # 2) Momentum: normalized 5/10/20-bar returns, direction-aware.
-    returns = []
-    for n in (5, 10, 20):
-        r = (close.iloc[-1] / close.iloc[-n-1] - 1.0) * 100.0
-        returns.append(r)
-    if strategy_side == "BUY":
-        mom = sum(max(0.0, min(abs(r) / 5.0, 1.0)) for r in returns) / 3.0
-        if any(r < 0 for r in returns):
-            mom *= 0.7
-    elif strategy_side == "SELL":
-        mom = sum(max(0.0, min(abs(r) / 5.0, 1.0)) for r in returns) / 3.0
-        if any(r > 0 for r in returns):
-            mom *= 0.7
-    else:
-        mom = sum(max(0.0, min(abs(r) / 5.0, 1.0)) for r in returns) / 3.0 * 0.5
-    momentum_score = 20.0 * mom
-
-    # 3) Volume: current closed candle volume versus 20-candle mean.
-    vol_mean = volume.iloc[-POWER_VOLUME_PERIOD-1:-1].mean()
-    vol_ratio = volume.iloc[-1] / vol_mean if vol_mean > 0 else 1.0
-    volume_score = 20.0 * _clamp((vol_ratio - 0.5) / 1.5, 0.0, 1.0)
-
-    # 4) ATR expansion: true range relative to its recent ATR baseline.
-    prev_close = close.shift(1)
-    tr = pd.concat([(high-low), (high-prev_close).abs(), (low-prev_close).abs()], axis=1).max(axis=1)
-    atr = tr.rolling(POWER_ATR_PERIOD).mean()
-    atr_now = float(atr.iloc[-1])
-    atr_base = float(atr.iloc[-21:-1].mean()) if len(atr) >= 22 else atr_now
-    atr_ratio = atr_now / atr_base if atr_base > 0 else 1.0
-    atr_score = 15.0 * _clamp((atr_ratio - 0.6) / 1.0, 0.0, 1.0)
-
-    # 5) EMA alignment and separation.
-    ema_fast = close.ewm(span=POWER_EMA_FAST, adjust=False).mean().iloc[-1]
-    ema_slow = close.ewm(span=POWER_EMA_SLOW, adjust=False).mean().iloc[-1]
-    sep = abs(ema_fast - ema_slow) / close.iloc[-1] * 100.0
-    ema_aligned = (ema_fast > ema_slow) if strategy_side == "BUY" else (ema_fast < ema_slow) if strategy_side == "SELL" else False
-    ema_score = 10.0 * _clamp(sep / 2.0, 0.0, 1.0) if ema_aligned else 0.0
-
-    # 6) Latest closed candle confirmation.
-    body = abs(close.iloc[-1] - open_.iloc[-1])
-    candle_range = max(high.iloc[-1] - low.iloc[-1], 1e-12)
-    body_ratio = body / candle_range
-    candle_direction = "BUY" if close.iloc[-1] > open_.iloc[-1] else "SELL" if close.iloc[-1] < open_.iloc[-1] else None
-    candle_score = 10.0 * body_ratio if candle_direction == strategy_side else 0.0
-
-    score = _clamp(structure + momentum_score + volume_score + atr_score + ema_score + candle_score)
-    trend = "RISING" if score >= 60 else "FALLING" if score < 40 else "FLAT"
-    phase = "OVERDRIVE" if score >= 81 else "EXPANSION" if score >= 61 else "ACTIVE" if score >= 41 else "WEAK" if score >= 21 else "DORMANT"
-    return {
-        "score": round(score, 1),
-        "side": strategy_side or momentum_side or "NEUTRAL",
-        "trend": trend,
-        "phase": phase,
-        "components": {
-            "structure": round(structure, 1),
-            "momentum": round(momentum_score, 1),
-            "volume": round(volume_score, 1),
-            "atr": round(atr_score, 1),
-            "ema": round(ema_score, 1),
-            "candle": round(candle_score, 1),
-        },
-    }
-
-
-def update_btc_power(state, df):
-    power = btc_power_score(df)
-    if power is None:
-        return None
-    boss = state.setdefault("market_boss", {})
-    history = boss.setdefault("power_history", [])
-    point = {"time": utc_now(), "score": power["score"], "side": power["side"], "phase": power["phase"]}
-    if not history or history[-1].get("score") != point["score"] or history[-1].get("phase") != point["phase"]:
-        history.append(point)
-        del history[:-POWER_HISTORY_LIMIT]
-    previous = history[-2]["score"] if len(history) >= 2 else power["score"]
-    power["trend"] = "RISING" if power["score"] > previous + 1 else "FALLING" if power["score"] < previous - 1 else "FLAT"
-    boss["current"] = power
-    return power
-
-
-def market_boss_text(power):
-    if not power:
-        return ""
-    score = float(power["score"])
-    filled = int(round(score / 10.0))
-    bar = "█" * filled + "░" * (10 - filled)
-    arrow = "↗" if power.get("trend") == "RISING" else "↘" if power.get("trend") == "FALLING" else "→"
-    return f"⚔️ MARKET BOSS\nBTC {power.get('side','NEUTRAL')}\nPOWER {bar} {score:.0f}% {arrow}\nPHASE {power.get('phase','ACTIVE')}"
 
 
 # =========================================================
@@ -1737,7 +1595,9 @@ def record_equity_point(state, reason=""):
 def allocate_trade(state):
     portfolio = state["portfolio"]
     balance = float(portfolio["balance"])
-    margin = max(0.0, float(state["portfolio"].get("balance", STARTING_BALANCE))) * TRADE_MARGIN_PERCENT / 100.0
+    # Each new trade uses 5% of the CURRENT balance as margin.
+    # With 10x leverage, nominal position size is 50% of current balance.
+    margin = balance * (TRADE_MARGIN_PERCENT / 100.0)
     notional = margin * LEVERAGE
 
     # Never exceed the configured maximum number of simulated open positions.
@@ -1773,8 +1633,10 @@ def close_trade(state, info, active, exit_price, reason, candle_time=None):
     portfolio = state["portfolio"]
     balance_before = float(portfolio["balance"])
     balance_after = balance_before + pnl
-    portfolio["balance"] = balance_after
-    portfolio["total_realized_pnl"] = float(portfolio.get("total_realized_pnl", 0.0)) + pnl
+    portfolio["balance"] = float(balance_after)
+    portfolio["total_realized_pnl"] = (
+        float(portfolio.get("total_realized_pnl", 0.0)) + float(pnl)
+    )
     record_equity_point(state, f"trade #{active.get('trade_number')} {reason}")
 
     closed = {
@@ -1880,17 +1742,7 @@ def active_trade_details_text(active, info):
 # SIGNAL MESSAGE
 # =========================================================
 
-def signal_dna(info, signal, btc_power=None):
-    """Create a compact deterministic visual signature for each signal."""
-    import hashlib
-    raw = f"{info.get('symbol','')}|{signal.get('id','')}|{signal.get('side','')}|{(btc_power or {}).get('score','')}"
-    digest = hashlib.sha256(raw.encode("utf-8")).hexdigest().upper()
-    shapes = ["◢", "◆", "◥", "◇", "◣", "✦", "◈", "━"]
-    glyphs = [shapes[int(ch, 16) % len(shapes)] for ch in digest[:6]]
-    return f"{' '.join(glyphs)}  {digest[:2]}•{digest[2:4]}•{digest[4:6]}"
-
-
-def signal_text(info, signal, trade_number=None, margin=None, notional=None, btc_power=None):
+def signal_text(info, signal, trade_number=None, margin=None, notional=None):
     side = canonical_side_from_event(signal.get("event_direction")) or signal.get("side")
     if side not in ("BUY", "SELL"):
         raise ValueError(f"Invalid signal side: {side}")
@@ -1909,26 +1761,15 @@ def signal_text(info, signal, trade_number=None, margin=None, notional=None, btc
         f"🛑 SL اولیه: {float(signal['sl']):.12g}",
     ]
     if margin is not None and notional is not None:
-        lines += [f"💵 مارجین: ${margin:.2f} ({TRADE_MARGIN_PERCENT:g}% موجودی)", f"📊 ارزش پوزیشن: ${notional:.2f}", f"⚡ اهرم: {LEVERAGE:g}x"]
+        lines += [f"💵 مارجین: ${margin:.2f}", f"📊 ارزش پوزیشن: ${notional:.2f}", f"⚡ اهرم: {LEVERAGE:g}x", f"🧮 حجم معامله: {TRADE_MARGIN_PERCENT:g}% موجودی"]
     lines += ["", "🎯 اهداف:"]
     # فقط TP1 و TP2 در پیام اصلی نمایش داده می‌شوند.
     levels = tp_levels()
     for name, percent in levels[:2]:
         lines.append(f"{name}: {calculate_tp_price(entry, signal['side'], percent):.12g} (+{percent:g}%)")
-    if btc_power:
-        score = float(btc_power.get("score", 0.0))
-        filled = int(round(score / 10.0))
-        bar = "█" * filled + "░" * (10 - filled)
-        trend_arrow = "↗" if btc_power.get("trend") == "RISING" else "↘" if btc_power.get("trend") == "FALLING" else "→"
-        lines += [
-            "",
-            "⚔️ MARKET BOSS",
-            f"BTC {btc_power.get('side','NEUTRAL')}  {bar} {score:.0f}% {trend_arrow}",
-            f"PHASE: {btc_power.get('phase','ACTIVE')}",
-        ]
     lines += [
         "",
-        f"🧬 SIGNATURE: {signal_dna(info, signal, btc_power)}",
+        f"💰 مارجین: {TRADE_MARGIN_PERCENT:g}% از موجودی",
         f"زمان: {utc_now()}",
         "",
         TELEGRAM_SIGNATURE,
@@ -1941,9 +1782,14 @@ def signal_text(info, signal, trade_number=None, margin=None, notional=None, btc
 # STOP LOSS MESSAGE
 # =========================================================
 
-def stop_text(info, active, exit_price=None, pnl=None):
+def stop_text(info, active, exit_price=None, pnl=None, balance_after=None):
     sign = "+" if pnl is not None and pnl >= 0 else ""
     pnl_line = f"PnL: {sign}${pnl:.2f}" if pnl is not None else ""
+    balance_line = (
+        f"💰 موجودی جدید: ${float(balance_after):.2f}\n"
+        if balance_after is not None
+        else ""
+    )
     return (
         "🛑 معامله بسته شد روی SL\n\n"
         f"🔢 شماره معامله: #{active.get('trade_number')}\n"
@@ -1953,6 +1799,7 @@ def stop_text(info, active, exit_price=None, pnl=None):
         f"SL فعال: {float(active.get('current_sl', active.get('sl'))):.12g}\n"
         + (f"خروج: {float(exit_price):.12g}\n" if exit_price is not None else "")
         + (pnl_line + "\n" if pnl is not None else "")
+        + balance_line
         + f"\n{TELEGRAM_SIGNATURE}"
     )
 
@@ -2090,14 +1937,46 @@ def check_stop(state, info, df):
         return
     candle_time = df.index[-2].isoformat()
     delivery_key = f"STOP|{info['symbol']}|{active['signal_id']}|{candle_time}|{sl:.12g}"
-    # PnL is calculated once, after the stop notification is successfully delivered.
-    pnl = trade_pnl(float(active["entry_price"]), sl, active["side"], float(active.get("notional", 0.0)))
-    text = stop_text(info, active, sl, pnl)
+    # Calculate the PnL and resulting balance before sending the close message.
+    pnl = trade_pnl(
+        float(active["entry_price"]),
+        sl,
+        active["side"],
+        float(active.get("notional", 0.0)),
+    )
+    balance_before = float(state["portfolio"].get("balance", STARTING_BALANCE))
+    balance_after = balance_before + pnl
+
+    text = stop_text(
+        info,
+        active,
+        sl,
+        pnl,
+        balance_after=balance_after,
+    )
+
     if not deliver_once(state, delivery_key, text):
         save_state(state)
         return
-    close_trade(state, info, active, sl, "TRAILING SL" if active.get("last_tp_hit") else "INITIAL SL", candle_time)
-    print(f"Stop loss sent for {info['symbol']} trade #{active.get('trade_number')}")
+
+    closed = close_trade(
+        state,
+        info,
+        active,
+        sl,
+        "TRAILING SL" if active.get("last_tp_hit") else "INITIAL SL",
+        candle_time,
+    )
+
+    state["portfolio"]["balance"] = float(closed["balance_after"])
+    save_state(state)
+
+    print(
+        f"Stop loss sent for {info['symbol']} "
+        f"trade #{active.get('trade_number')} | "
+        f"PnL={pnl:+.2f} | "
+        f"new balance=${float(closed['balance_after']):.2f}"
+    )
 
 
 def portfolio_metrics(state):
@@ -2256,7 +2135,7 @@ def get_previous_month():
 
     previous_month_last_day = (
         first_day_current
-        - pd.Timedelta(days=1)
+        - pd.Timedelta(days=1, unit="D")
     )
 
     return previous_month_last_day.strftime(
@@ -2327,7 +2206,7 @@ def previous_week_start():
 
     previous_week = (
         current_week_start
-        - pd.Timedelta(days=7)
+        - pd.Timedelta(days=7, unit="D")
     )
 
     return previous_week.strftime(
@@ -2338,9 +2217,9 @@ def previous_week_start():
 def weekly_report_text(state, week_string):
     try:
         start = datetime.strptime(week_string, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-        end = start + pd.Timedelta(days=7)
+        end = start + pd.Timedelta(days=7, unit="D")
     except Exception:
-        start = utc_datetime() - pd.Timedelta(days=7)
+        start = utc_datetime() - pd.Timedelta(days=7, unit="D")
         end = utc_datetime()
     trades = []
     for t in state.get("closed_trades", []):
@@ -2358,7 +2237,7 @@ def weekly_report_text(state, week_string):
     best = max((float(t.get("pnl", 0)) for t in trades), default=0.0)
     worst = min((float(t.get("pnl", 0)) for t in trades), default=0.0)
     peak, drawdown = portfolio_metrics(state)
-    return (f"📊 گزارش هفتگی\n\n📅 هفته: {week_string} تا {(start + pd.Timedelta(days=6)).strftime('%Y-%m-%d')}\n\n"
+    return (f"📊 گزارش هفتگی\n\n📅 هفته: {week_string} تا {(start + pd.Timedelta(days=6, unit="D")).strftime('%Y-%m-%d')}\n\n"
             f"💰 موجودی ابتدای هفته: ${opening:.2f}\n"
             f"💰 موجودی پایان هفته: ${closing:.2f}\n"
             f"📈 سود/ضرر هفته: {'+' if pnl >= 0 else ''}${pnl:.2f}\n"
@@ -2475,10 +2354,48 @@ def add_ob_distance(signal, df):
 
 
 # =========================================================
+# BTC MASTER ORDER DIRECTION
+# =========================================================
+
+BTC_REFERENCE_SYMBOL = "BTCUSDT"
+
+
+def get_latest_btc_order():
+    """
+    آخرین Order معتبر BTCUSDT در تایم‌فریم 4H را پیدا می‌کند.
+    جهت آن Master Direction برای سیگنال‌های جدید سایر ارزهاست.
+    """
+    btc_df = download_4h(BTC_REFERENCE_SYMBOL)
+
+    if btc_df is None or len(btc_df) < 30:
+        print("BTC MASTER: insufficient BTC 4H data.")
+        return None
+
+    btc_signals = latest_signals(btc_df)
+    if not btc_signals:
+        print("BTC MASTER: no BTC order found.")
+        return None
+
+    latest_btc = btc_signals[-1]
+    side = latest_btc.get("side")
+
+    if side not in ("BUY", "SELL"):
+        print(f"BTC MASTER: invalid BTC side: {side}")
+        return None
+
+    print(
+        "BTC MASTER ORDER: "
+        f"{side} | time={latest_btc.get('event_time')} | "
+        f"id={latest_btc.get('id')}"
+    )
+    return latest_btc
+
+
+# =========================================================
 # ANALYZE SYMBOL
 # =========================================================
 
-def analyze_symbol(state, info, df):
+def analyze_symbol(state, info, df, btc_master_signal=None):
     check_take_profits(state, info, df)
     check_stop(state, info, df)
 
@@ -2541,6 +2458,36 @@ def analyze_symbol(state, info, df):
     state["last_event"][symbol] = signal["event_time"]
     state["last_signal"][symbol] = signal["id"]
 
+    # =====================================================
+    # BTC MASTER DIRECTION FILTER
+    # =====================================================
+    # Only NEW orders aligned with the latest BTC 4H order
+    # are eligible for Telegram delivery. The symbol cursor
+    # has already advanced, so rejected opposite signals are
+    # not retried on every workflow run.
+
+    if btc_master_signal is None:
+        print(
+            f"{symbol}: signal rejected because BTC master order is unavailable."
+        )
+        save_state(state)
+        return
+
+    btc_side = btc_master_signal.get("side")
+
+    if signal["side"] != btc_side:
+        print(
+            f"{symbol}: new order rejected by BTC master direction | "
+            f"coin={signal['side']} | BTC={btc_side}"
+        )
+        save_state(state)
+        return
+
+    print(
+        f"{symbol}: BTC alignment OK | "
+        f"coin={signal['side']} | BTC={btc_side}"
+    )
+
     # Calculate the OB distance before applying the 4% filter.
     signal = add_ob_distance(signal, df)
     ob_distance = signal_ob_distance_percent(signal)
@@ -2567,6 +2514,17 @@ def analyze_symbol(state, info, df):
     else:
         entry_price = float(signal["zone_high"])
 
+    # Initial SL is always 10% away from the actual signal entry.
+    # BUY: 10% below entry. SELL: 10% above entry.
+    if signal["side"] == "BUY":
+        initial_sl = entry_price * (1.0 - INITIAL_SL_PERCENT / 100.0)
+    else:
+        initial_sl = entry_price * (1.0 + INITIAL_SL_PERCENT / 100.0)
+
+    # Store the entry-based SL in the signal object so the Telegram signal
+    # and the active trade use exactly the same initial stop.
+    signal["sl"] = float(initial_sl)
+
     try:
         trade_number, margin, notional = allocate_trade(state)
     except RuntimeError as error:
@@ -2574,13 +2532,7 @@ def analyze_symbol(state, info, df):
         save_state(state)
         return
 
-    # Initial protection is fixed at 10% from entry, per risk settings.
-    if signal["side"] == "BUY":
-        signal["sl"] = entry_price * 0.90
-    else:
-        signal["sl"] = entry_price * 1.10
-
-    text = signal_text(info, signal, trade_number, margin, notional, state.get("market_boss", {}).get("current"))
+    text = signal_text(info, signal, trade_number, margin, notional)
     # TP1 is the button that reveals TP3 through TP40. TP2 remains visible in the main message.
     reply_markup = {
         "inline_keyboard": [
@@ -2666,16 +2618,19 @@ def main():
     record_equity_point(state, "heartbeat")
     # Telegram commands are handled by the separate command workflow.
 
-    btc_power = None
-    try:
-        btc_df = download_4h("BTCUSDT")
-        btc_power = update_btc_power(state, btc_df)
-        if btc_power:
-            print("BTC MARKET POWER:", btc_power["score"], btc_power["side"], btc_power["phase"], btc_power["trend"])
-    except Exception as error:
-        print(f"BTC power calculation failed: {error}")
-
     binance_symbols = get_binance_spot_symbols()
+
+    # =====================================================
+    # BTC MASTER ORDER
+    # =====================================================
+    # BTC determines the allowed direction for NEW orders.
+    btc_master_signal = get_latest_btc_order()
+
+    if btc_master_signal is None:
+        print(
+            "BTC MASTER ORDER unavailable. "
+            "No new coin signals will be sent in this run."
+        )
 
     workers = max(1, min(BINANCE_SCAN_WORKERS, 32))
     print(f"Binance parallel scan workers: {workers}")
@@ -2700,7 +2655,7 @@ def main():
             continue
         print(f"{symbol} rows={len(df)}")
         try:
-            analyze_symbol(state, info, df)
+            analyze_symbol(state, info, df, btc_master_signal=btc_master_signal)
         except Exception as error:
             print(f"{symbol}: ERROR: {error}")
 
