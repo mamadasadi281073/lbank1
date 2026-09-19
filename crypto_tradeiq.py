@@ -1629,8 +1629,13 @@ def close_trade(state, info, active, exit_price, reason, candle_time=None):
     portfolio = state["portfolio"]
     balance_before = float(portfolio["balance"])
     balance_after = balance_before + pnl
-    portfolio["balance"] = balance_after
-    portfolio["total_realized_pnl"] = float(portfolio.get("total_realized_pnl", 0.0)) + pnl
+
+    # Realized PnL is applied immediately when a position closes.
+    # This is the single source of truth for the portfolio balance.
+    portfolio["balance"] = float(balance_after)
+    portfolio["total_realized_pnl"] = (
+        float(portfolio.get("total_realized_pnl", 0.0)) + float(pnl)
+    )
     record_equity_point(state, f"trade #{active.get('trade_number')} {reason}")
 
     closed = {
@@ -1776,9 +1781,14 @@ def signal_text(info, signal, trade_number=None, margin=None, notional=None):
 # STOP LOSS MESSAGE
 # =========================================================
 
-def stop_text(info, active, exit_price=None, pnl=None):
+def stop_text(info, active, exit_price=None, pnl=None, balance_after=None):
     sign = "+" if pnl is not None and pnl >= 0 else ""
     pnl_line = f"PnL: {sign}${pnl:.2f}" if pnl is not None else ""
+    balance_line = (
+        f"💰 موجودی جدید: ${float(balance_after):.2f}\n"
+        if balance_after is not None
+        else ""
+    )
     return (
         "🛑 معامله بسته شد روی SL\n\n"
         f"🔢 شماره معامله: #{active.get('trade_number')}\n"
@@ -1788,6 +1798,7 @@ def stop_text(info, active, exit_price=None, pnl=None):
         f"SL فعال: {float(active.get('current_sl', active.get('sl'))):.12g}\n"
         + (f"خروج: {float(exit_price):.12g}\n" if exit_price is not None else "")
         + (pnl_line + "\n" if pnl is not None else "")
+        + balance_line
         + f"\n{TELEGRAM_SIGNATURE}"
     )
 
@@ -1893,8 +1904,40 @@ def check_take_profits(state, info, df):
         print(f"{info['symbol']}: {tp_name} hit at {tp_price:.12g}; SL -> {new_sl:.12g}")
 
         if tp_name == "TP40":
-            closed = close_trade(state, info, active, tp_price, "FULL TP (TP40)", df.index[monitor_idx].isoformat())
-            print(f"{info['symbol']}: TP40 / Full TP closed trade #{closed.get('trade_number')}")
+            closed = close_trade(
+                state,
+                info,
+                active,
+                tp_price,
+                "FULL TP (TP40)",
+                df.index[monitor_idx].isoformat(),
+            )
+
+            # The TP40 notification was already delivered above. Send a
+            # separate one-time close confirmation containing the actual
+            # post-PnL balance, so the channel always shows the new balance.
+            close_delivery_key = (
+                f"CLOSE_BALANCE|{info['symbol']}|"
+                f"{active['signal_id']}|TP40"
+            )
+            close_text = (
+                "🏁 معامله کامل بسته شد\n\n"
+                f"🔢 شماره معامله: #{closed.get('trade_number')}\n"
+                f"نماد: {info['symbol']}\n"
+                f"جهت: {closed.get('side')}\n"
+                f"خروج نهایی: {float(closed.get('exit_price', tp_price)):.12g}\n"
+                f"PnL: {'+' if float(closed.get('pnl', 0)) >= 0 else ''}"
+                f"${float(closed.get('pnl', 0)):.2f}\n"
+                f"💰 موجودی جدید: ${float(closed.get('balance_after', state['portfolio']['balance'])):.2f}\n\n"
+                f"{TELEGRAM_SIGNATURE}"
+            )
+            deliver_once(state, close_delivery_key, close_text)
+            save_state(state)
+            print(
+                f"{info['symbol']}: TP40 / Full TP closed trade "
+                f"#{closed.get('trade_number')} | "
+                f"balance=${float(closed.get('balance_after', 0)):.2f}"
+            )
             return
 
 
@@ -1925,14 +1968,48 @@ def check_stop(state, info, df):
         return
     candle_time = df.index[-2].isoformat()
     delivery_key = f"STOP|{info['symbol']}|{active['signal_id']}|{candle_time}|{sl:.12g}"
-    # PnL is calculated once, after the stop notification is successfully delivered.
-    pnl = trade_pnl(float(active["entry_price"]), sl, active["side"], float(active.get("notional", 0.0)))
-    text = stop_text(info, active, sl, pnl)
+    # Calculate PnL and the exact post-close balance before sending the
+    # notification. The balance is then persisted by close_trade().
+    pnl = trade_pnl(
+        float(active["entry_price"]),
+        sl,
+        active["side"],
+        float(active.get("notional", 0.0)),
+    )
+    balance_before = float(state["portfolio"].get("balance", STARTING_BALANCE))
+    balance_after = balance_before + pnl
+
+    text = stop_text(
+        info,
+        active,
+        sl,
+        pnl,
+        balance_after=balance_after,
+    )
+
     if not deliver_once(state, delivery_key, text):
         save_state(state)
         return
-    close_trade(state, info, active, sl, "TRAILING SL" if active.get("last_tp_hit") else "INITIAL SL", candle_time)
-    print(f"Stop loss sent for {info['symbol']} trade #{active.get('trade_number')}")
+
+    closed = close_trade(
+        state,
+        info,
+        active,
+        sl,
+        "TRAILING SL" if active.get("last_tp_hit") else "INITIAL SL",
+        candle_time,
+    )
+
+    # Explicitly persist the final portfolio state after closing.
+    state["portfolio"]["balance"] = float(closed["balance_after"])
+    save_state(state)
+
+    print(
+        f"Stop loss sent for {info['symbol']} "
+        f"trade #{active.get('trade_number')} | "
+        f"PnL={pnl:+.2f} | "
+        f"new balance=${float(closed['balance_after']):.2f}"
+    )
 
 
 def portfolio_metrics(state):
