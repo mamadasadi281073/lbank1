@@ -5757,7 +5757,27 @@
   },
   "last_signal_scan_candle": "2026-09-19T08:00:00+00:00",
   "market_boss": {
-    "current": null,
-    "power_history": []
+    "current": {
+      "score": 54.7,
+      "side": "BUY",
+      "trend": "FLAT",
+      "phase": "ACTIVE",
+      "components": {
+        "structure": 25.0,
+        "momentum": 14.3,
+        "volume": 1.6,
+        "atr": 4.6,
+        "ema": 4.7,
+        "candle": 4.5
+      }
+    },
+    "power_history": [
+      {
+        "time": "2026-09-19 15:11:43 UTC",
+        "score": 54.7,
+        "side": "BUY",
+        "phase": "ACTIVE"
+      }
+    ]
   }
 }
