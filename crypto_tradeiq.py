@@ -2310,10 +2310,51 @@ def add_ob_distance(signal, df):
 
 
 # =========================================================
+# BTC MASTER ORDER DIRECTION
+# =========================================================
+
+BTC_REFERENCE_SYMBOL = "BTCUSDT"
+
+
+def get_latest_btc_order():
+    """
+    آخرین Order معتبر BTCUSDT در تایم‌فریم 4H را پیدا می‌کند.
+    فقط جهت آخرین Order بیت‌کوین برای فیلتر سیگنال‌های جدید استفاده می‌شود.
+    """
+    btc_df = download_4h(BTC_REFERENCE_SYMBOL)
+
+    if btc_df is None or len(btc_df) < 30:
+        print("BTC MASTER: insufficient BTC 4H data.")
+        return None
+
+    btc_signals = latest_signals(btc_df)
+
+    if not btc_signals:
+        print("BTC MASTER: no BTC order found.")
+        return None
+
+    latest_btc = btc_signals[-1]
+    side = latest_btc.get("side")
+
+    if side not in ("BUY", "SELL"):
+        print(f"BTC MASTER: invalid BTC side: {side}")
+        return None
+
+    print(
+        "BTC MASTER ORDER: "
+        f"{side} | "
+        f"time={latest_btc.get('event_time')} | "
+        f"id={latest_btc.get('id')}"
+    )
+
+    return latest_btc
+
+
+# =========================================================
 # ANALYZE SYMBOL
 # =========================================================
 
-def analyze_symbol(state, info, df):
+def analyze_symbol(state, info, df, btc_master_signal=None):
     check_take_profits(state, info, df)
     check_stop(state, info, df)
 
@@ -2375,6 +2416,37 @@ def analyze_symbol(state, info, df):
     # an old signal which fails a filter cannot be re-sent on every run.
     state["last_event"][symbol] = signal["event_time"]
     state["last_signal"][symbol] = signal["id"]
+
+    # =====================================================
+    # BTC MASTER DIRECTION FILTER
+    # =====================================================
+    # The signal must be NEW for this symbol AND have the same
+    # direction as the latest completed BTC 4H order.
+    #
+    # The per-symbol cursor is advanced BEFORE this filter, so
+    # an opposite-direction signal is not retried on every run.
+
+    if btc_master_signal is None:
+        print(
+            f"{symbol}: signal rejected because BTC master order is unavailable."
+        )
+        save_state(state)
+        return
+
+    btc_side = btc_master_signal.get("side")
+
+    if signal["side"] != btc_side:
+        print(
+            f"{symbol}: new order rejected by BTC master direction | "
+            f"coin={signal['side']} | BTC={btc_side}"
+        )
+        save_state(state)
+        return
+
+    print(
+        f"{symbol}: BTC alignment OK | "
+        f"coin={signal['side']} | BTC={btc_side}"
+    )
 
     # Calculate the OB distance before applying the 4% filter.
     signal = add_ob_distance(signal, df)
@@ -2497,6 +2569,20 @@ def main():
 
     binance_symbols = get_binance_spot_symbols()
 
+    # =====================================================
+    # BTC MASTER ORDER
+    # =====================================================
+    # BTC is checked independently because it is the master
+    # direction for all new signals. If BTC cannot be resolved,
+    # no new coin signal is sent during this run.
+    btc_master_signal = get_latest_btc_order()
+
+    if btc_master_signal is None:
+        print(
+            "BTC MASTER ORDER unavailable. "
+            "No new coin signals will be sent in this run."
+        )
+
     workers = max(1, min(BINANCE_SCAN_WORKERS, 32))
     print(f"Binance parallel scan workers: {workers}")
 
@@ -2520,7 +2606,7 @@ def main():
             continue
         print(f"{symbol} rows={len(df)}")
         try:
-            analyze_symbol(state, info, df)
+            analyze_symbol(state, info, df, btc_master_signal=btc_master_signal)
         except Exception as error:
             print(f"{symbol}: ERROR: {error}")
 
