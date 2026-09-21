@@ -56,13 +56,9 @@ TP8_PERCENT = 20.0
 # TP40 is the final / FULL TP.
 
 STARTING_BALANCE = 200.0
-TRADE_MARGIN_PERCENT = 5.0
+CLOSE_FEE_USD = float(os.getenv("CLOSE_FEE_USD", "1.0"))
+FIXED_MARGIN = 10.0
 LEVERAGE = 10.0
-POWER_EMA_FAST = 20
-POWER_EMA_SLOW = 50
-POWER_ATR_PERIOD = 14
-POWER_VOLUME_PERIOD = 20
-POWER_HISTORY_LIMIT = 100
 
 # Maximum allowed distance between the signal event close and the
 # selected Order Block boundary. Kept identical to the original filter.
@@ -215,6 +211,7 @@ def load_state():
         "deliveries",
         {},
     )
+    state.setdefault("pending_notifications", {})
 
     state.setdefault(
         "daily_stats",
@@ -241,7 +238,6 @@ def load_state():
         "",
     )
 
-    state.setdefault("market_boss", {"current": None, "power_history": []})
     state.setdefault("closed_trades", [])
     portfolio = state.setdefault("portfolio", {})
     portfolio.setdefault("initial_balance", STARTING_BALANCE)
@@ -449,7 +445,7 @@ def get_monthly_stats(
 
 def get_week_start(dt):
     # هفته از دوشنبه شروع می‌شود.
-    monday = dt - pd.Timedelta(days=int(dt.weekday()), unit="D")
+    monday = dt - pd.Timedelta(days=int(dt.weekday()))
     return monday.strftime("%Y-%m-%d")
 
 
@@ -1048,9 +1044,6 @@ def _binance_kline(symbol, size, interval):
                     "High": float(item[2]),
                     "Low": float(item[3]),
                     "Close": float(item[4]),
-                    # Binance Spot Kline field 5 = base-asset volume.
-                    # Keep it so BTC Market Power can use real volume data.
-                    "Volume": float(item[5]),
                 })
             except (TypeError, ValueError):
                 continue
@@ -1064,7 +1057,7 @@ def _binance_kline(symbol, size, interval):
             .sort_values("Time")
             .set_index("Time")
         )
-        df = df[["Open", "High", "Low", "Close", "Volume"]].dropna().copy()
+        df = df[["Open", "High", "Low", "Close"]].dropna().copy()
 
         # Ignore the currently forming candle.
         if len(df) > 1:
@@ -1117,144 +1110,6 @@ def daily_order_matches(
         four_hour_signal["side"]
         == daily_signal["side"]
     )
-
-
-# =========================================================
-# BTC MARKET BOSS / POWER
-# =========================================================
-
-def _clamp(value, low=0.0, high=100.0):
-    return max(low, min(high, float(value)))
-
-
-def btc_power_score(df):
-    """Calculate a deterministic 0-100 BTC market-strength score from 4H data.
-
-    Components: strategy direction/structure (25), momentum (20), volume (20),
-    ATR expansion (15), EMA alignment (10), latest closed-candle confirmation (10).
-    The current still-forming 4H candle is excluded when possible.
-    """
-    if df is None or len(df) < 60:
-        return None
-    d = df.copy().sort_index()
-    # Binance klines normally include the current candle; exclude it by timestamp
-    # if it is newer than the most recent fully completed 4H boundary.
-    now = pd.Timestamp.now(tz="UTC")
-    if getattr(d.index, "tz", None) is None:
-        idx = pd.to_datetime(d.index, utc=True)
-    else:
-        idx = d.index
-    d = d.copy()
-    d.index = idx
-    boundary = now.floor("4h")
-    d = d[d.index < boundary]
-    if len(d) < 60:
-        return None
-
-    close = d["Close"].astype(float)
-    open_ = d["Open"].astype(float)
-    high = d["High"].astype(float)
-    low = d["Low"].astype(float)
-    volume = d["Volume"].astype(float)
-
-    # 1) Strategy/event component: reward the latest strategy direction and
-    # magnitude of the latest 4H move, capped to avoid dominating the score.
-    latest = latest_signals(d)
-    strategy_side = latest[-1]["side"] if latest else None
-    ret4 = (close.iloc[-1] / close.iloc[-5] - 1.0) * 100.0
-    momentum_side = "BUY" if ret4 > 0 else "SELL" if ret4 < 0 else None
-    alignment = 1.0 if strategy_side and strategy_side == momentum_side else 0.0
-    structure = 12.5 if strategy_side else 7.5
-    structure += 12.5 * alignment
-
-    # 2) Momentum: normalized 5/10/20-bar returns, direction-aware.
-    returns = []
-    for n in (5, 10, 20):
-        r = (close.iloc[-1] / close.iloc[-n-1] - 1.0) * 100.0
-        returns.append(r)
-    if strategy_side == "BUY":
-        mom = sum(max(0.0, min(abs(r) / 5.0, 1.0)) for r in returns) / 3.0
-        if any(r < 0 for r in returns):
-            mom *= 0.7
-    elif strategy_side == "SELL":
-        mom = sum(max(0.0, min(abs(r) / 5.0, 1.0)) for r in returns) / 3.0
-        if any(r > 0 for r in returns):
-            mom *= 0.7
-    else:
-        mom = sum(max(0.0, min(abs(r) / 5.0, 1.0)) for r in returns) / 3.0 * 0.5
-    momentum_score = 20.0 * mom
-
-    # 3) Volume: current closed candle volume versus 20-candle mean.
-    vol_mean = volume.iloc[-POWER_VOLUME_PERIOD-1:-1].mean()
-    vol_ratio = volume.iloc[-1] / vol_mean if vol_mean > 0 else 1.0
-    volume_score = 20.0 * _clamp((vol_ratio - 0.5) / 1.5, 0.0, 1.0)
-
-    # 4) ATR expansion: true range relative to its recent ATR baseline.
-    prev_close = close.shift(1)
-    tr = pd.concat([(high-low), (high-prev_close).abs(), (low-prev_close).abs()], axis=1).max(axis=1)
-    atr = tr.rolling(POWER_ATR_PERIOD).mean()
-    atr_now = float(atr.iloc[-1])
-    atr_base = float(atr.iloc[-21:-1].mean()) if len(atr) >= 22 else atr_now
-    atr_ratio = atr_now / atr_base if atr_base > 0 else 1.0
-    atr_score = 15.0 * _clamp((atr_ratio - 0.6) / 1.0, 0.0, 1.0)
-
-    # 5) EMA alignment and separation.
-    ema_fast = close.ewm(span=POWER_EMA_FAST, adjust=False).mean().iloc[-1]
-    ema_slow = close.ewm(span=POWER_EMA_SLOW, adjust=False).mean().iloc[-1]
-    sep = abs(ema_fast - ema_slow) / close.iloc[-1] * 100.0
-    ema_aligned = (ema_fast > ema_slow) if strategy_side == "BUY" else (ema_fast < ema_slow) if strategy_side == "SELL" else False
-    ema_score = 10.0 * _clamp(sep / 2.0, 0.0, 1.0) if ema_aligned else 0.0
-
-    # 6) Latest closed candle confirmation.
-    body = abs(close.iloc[-1] - open_.iloc[-1])
-    candle_range = max(high.iloc[-1] - low.iloc[-1], 1e-12)
-    body_ratio = body / candle_range
-    candle_direction = "BUY" if close.iloc[-1] > open_.iloc[-1] else "SELL" if close.iloc[-1] < open_.iloc[-1] else None
-    candle_score = 10.0 * body_ratio if candle_direction == strategy_side else 0.0
-
-    score = _clamp(structure + momentum_score + volume_score + atr_score + ema_score + candle_score)
-    trend = "RISING" if score >= 60 else "FALLING" if score < 40 else "FLAT"
-    phase = "OVERDRIVE" if score >= 81 else "EXPANSION" if score >= 61 else "ACTIVE" if score >= 41 else "WEAK" if score >= 21 else "DORMANT"
-    return {
-        "score": round(score, 1),
-        "side": strategy_side or momentum_side or "NEUTRAL",
-        "trend": trend,
-        "phase": phase,
-        "components": {
-            "structure": round(structure, 1),
-            "momentum": round(momentum_score, 1),
-            "volume": round(volume_score, 1),
-            "atr": round(atr_score, 1),
-            "ema": round(ema_score, 1),
-            "candle": round(candle_score, 1),
-        },
-    }
-
-
-def update_btc_power(state, df):
-    power = btc_power_score(df)
-    if power is None:
-        return None
-    boss = state.setdefault("market_boss", {})
-    history = boss.setdefault("power_history", [])
-    point = {"time": utc_now(), "score": power["score"], "side": power["side"], "phase": power["phase"]}
-    if not history or history[-1].get("score") != point["score"] or history[-1].get("phase") != point["phase"]:
-        history.append(point)
-        del history[:-POWER_HISTORY_LIMIT]
-    previous = history[-2]["score"] if len(history) >= 2 else power["score"]
-    power["trend"] = "RISING" if power["score"] > previous + 1 else "FALLING" if power["score"] < previous - 1 else "FLAT"
-    boss["current"] = power
-    return power
-
-
-def market_boss_text(power):
-    if not power:
-        return ""
-    score = float(power["score"])
-    filled = int(round(score / 10.0))
-    bar = "█" * filled + "░" * (10 - filled)
-    arrow = "↗" if power.get("trend") == "RISING" else "↘" if power.get("trend") == "FALLING" else "→"
-    return f"⚔️ MARKET BOSS\nBTC {power.get('side','NEUTRAL')}\nPOWER {bar} {score:.0f}% {arrow}\nPHASE {power.get('phase','ACTIVE')}"
 
 
 # =========================================================
@@ -1640,6 +1495,24 @@ def deliver_once(
     )
 
 
+def queue_notification(state, delivery_key, text, reply_markup=None):
+    pending = state.setdefault("pending_notifications", {})
+    pending[delivery_key] = {"text": text, "reply_markup": reply_markup}
+    save_state(state)
+
+
+def flush_pending_notifications(state):
+    pending = state.setdefault("pending_notifications", {})
+    for delivery_key, item in list(pending.items()):
+        delivered = deliver_once(
+            state, delivery_key, item.get("text", ""),
+            reply_markup=item.get("reply_markup")
+        )
+        if delivered:
+            pending.pop(delivery_key, None)
+    save_state(state)
+
+
 # =========================================================
 # SIMULATION / TRADE HELPERS
 # =========================================================
@@ -1740,7 +1613,7 @@ def record_equity_point(state, reason=""):
 def allocate_trade(state):
     portfolio = state["portfolio"]
     balance = float(portfolio["balance"])
-    margin = max(0.0, float(state["portfolio"].get("balance", STARTING_BALANCE))) * TRADE_MARGIN_PERCENT / 100.0
+    margin = FIXED_MARGIN
     notional = margin * LEVERAGE
 
     # Never exceed the configured maximum number of simulated open positions.
@@ -1770,16 +1643,18 @@ def allocate_trade(state):
 
 
 def close_trade(state, info, active, exit_price, reason, candle_time=None):
+    """Close position and persist PnL/balance before any Telegram delivery."""
     entry = float(active["entry_price"])
     notional = float(active.get("notional", 0.0))
-    pnl = trade_pnl(entry, float(exit_price), active["side"], notional)
+    gross_pnl = trade_pnl(entry, float(exit_price), active["side"], notional)
+    fee = max(0.0, CLOSE_FEE_USD)
+    pnl = gross_pnl - fee
     portfolio = state["portfolio"]
     balance_before = float(portfolio["balance"])
     balance_after = balance_before + pnl
     portfolio["balance"] = balance_after
     portfolio["total_realized_pnl"] = float(portfolio.get("total_realized_pnl", 0.0)) + pnl
     record_equity_point(state, f"trade #{active.get('trade_number')} {reason}")
-
     closed = {
         "trade_number": active.get("trade_number"),
         "symbol": info["symbol"],
@@ -1793,6 +1668,8 @@ def close_trade(state, info, active, exit_price, reason, candle_time=None):
         "margin": float(active.get("margin", 0.0)),
         "notional": notional,
         "leverage": LEVERAGE,
+        "gross_pnl": gross_pnl,
+        "fee": fee,
         "pnl": pnl,
         "balance_before": balance_before,
         "balance_after": balance_after,
@@ -1806,7 +1683,6 @@ def close_trade(state, info, active, exit_price, reason, candle_time=None):
         "balance_at_entry": float(active.get("balance_at_entry", balance_before)),
     }
     state["closed_trades"].append(closed)
-
     signal_time = active["signal_time"]
     if pnl > 1e-12:
         register_daily_tp(state, active["signal_id"], signal_time)
@@ -1816,11 +1692,10 @@ def close_trade(state, info, active, exit_price, reason, candle_time=None):
         register_daily_sl(state, active["signal_id"], signal_time)
         register_monthly_sl(state, active["signal_id"], signal_time)
         register_weekly_sl(state, active["signal_id"], signal_time)
-
     state["active"].pop(info["symbol"], None)
     save_state(state)
+    print(f"{info['symbol']}: CLOSED #{closed.get('trade_number')} | {reason} | gross={gross_pnl:+.2f} fee={fee:.2f} net={pnl:+.2f} | balance {balance_before:.2f} -> {balance_after:.2f}")
     return closed
-
 
 def trade_details_text(trade, title="📋 جزئیات معامله"):
     pnl = float(trade.get("pnl", 0.0))
@@ -1840,8 +1715,11 @@ def trade_details_text(trade, title="📋 جزئیات معامله"):
         f"SL فعلی: {float(trade.get('current_sl', trade.get('initial_sl', 0))):.12g}\n"
         f"آخرین TP: {trade.get('last_tp_hit') or 'هیچ‌کدام'}\n"
         f"نتیجه: {trade.get('reason')}\n"
-        f"PnL: {sign}${pnl:.2f}\n"
-        f"موجودی بعد معامله: ${balance:.2f}\n\n"
+        f"PnL ناخالص: ${float(trade.get('gross_pnl', pnl)):+.2f}\n"
+        f"💸 کارمزد بسته‌شدن: -${float(trade.get('fee', 0.0)):.2f}\n"
+        f"PnL نهایی: {sign}${pnl:.2f}\n"
+        f"موجودی قبل معامله: ${float(trade.get('balance_before', 0.0)):.2f}\n"
+        f"💰 موجودی بعد معامله: ${balance:.2f}\n\n"
         f"{TELEGRAM_SIGNATURE}"
     )
 
@@ -1883,17 +1761,7 @@ def active_trade_details_text(active, info):
 # SIGNAL MESSAGE
 # =========================================================
 
-def signal_dna(info, signal, btc_power=None):
-    """Create a compact deterministic visual signature for each signal."""
-    import hashlib
-    raw = f"{info.get('symbol','')}|{signal.get('id','')}|{signal.get('side','')}|{(btc_power or {}).get('score','')}"
-    digest = hashlib.sha256(raw.encode("utf-8")).hexdigest().upper()
-    shapes = ["◢", "◆", "◥", "◇", "◣", "✦", "◈", "━"]
-    glyphs = [shapes[int(ch, 16) % len(shapes)] for ch in digest[:6]]
-    return f"{' '.join(glyphs)}  {digest[:2]}•{digest[2:4]}•{digest[4:6]}"
-
-
-def signal_text(info, signal, trade_number=None, margin=None, notional=None, btc_power=None):
+def signal_text(info, signal, trade_number=None, margin=None, notional=None):
     side = canonical_side_from_event(signal.get("event_direction")) or signal.get("side")
     if side not in ("BUY", "SELL"):
         raise ValueError(f"Invalid signal side: {side}")
@@ -1912,26 +1780,15 @@ def signal_text(info, signal, trade_number=None, margin=None, notional=None, btc
         f"🛑 SL اولیه: {float(signal['sl']):.12g}",
     ]
     if margin is not None and notional is not None:
-        lines += [f"💵 مارجین: ${margin:.2f} ({TRADE_MARGIN_PERCENT:g}% موجودی)", f"📊 ارزش پوزیشن: ${notional:.2f}", f"⚡ اهرم: {LEVERAGE:g}x"]
+        lines += [f"💵 مارجین: ${margin:.2f}", f"📊 ارزش پوزیشن: ${notional:.2f}", f"⚡ اهرم: {LEVERAGE:g}x"]
     lines += ["", "🎯 اهداف:"]
     # فقط TP1 و TP2 در پیام اصلی نمایش داده می‌شوند.
     levels = tp_levels()
     for name, percent in levels[:2]:
         lines.append(f"{name}: {calculate_tp_price(entry, signal['side'], percent):.12g} (+{percent:g}%)")
-    if btc_power:
-        score = float(btc_power.get("score", 0.0))
-        filled = int(round(score / 10.0))
-        bar = "█" * filled + "░" * (10 - filled)
-        trend_arrow = "↗" if btc_power.get("trend") == "RISING" else "↘" if btc_power.get("trend") == "FALLING" else "→"
-        lines += [
-            "",
-            "⚔️ MARKET BOSS",
-            f"BTC {btc_power.get('side','NEUTRAL')}  {bar} {score:.0f}% {trend_arrow}",
-            f"PHASE: {btc_power.get('phase','ACTIVE')}",
-        ]
     lines += [
         "",
-        f"🧬 SIGNATURE: {signal_dna(info, signal, btc_power)}",
+        f"💰 مارجین ثابت: ${float(margin):.2f}" if margin is not None else "",
         f"زمان: {utc_now()}",
         "",
         TELEGRAM_SIGNATURE,
@@ -2000,12 +1857,8 @@ def calculate_tp_price(
 
 def check_take_profits(state, info, df):
     active = state["active"].get(info["symbol"])
-    if not active or len(df) < 2:
+    if not active or df is None or len(df) < 2:
         return
-    # TP is monitored from the newest available candle so the 5-minute
-    # GitHub Actions worker can report an intrabar TP hit without waiting
-    # for the 4H candle to close. Signal generation itself still uses only
-    # completed 4H candles.
     monitor_idx = -1
     high = float(df["High"].iloc[monitor_idx])
     low = float(df["Low"].iloc[monitor_idx])
@@ -2016,55 +1869,46 @@ def check_take_profits(state, info, df):
         print(f"{info['symbol']}: active trade has no valid entry_price; skipping TP check.")
         return
     levels = tp_levels_for_side(side)
-
     for index, (tp_name, tp_percent) in enumerate(levels):
         hit_key = tp_hit_key(tp_name)
-        if active.get(hit_key, False):
-            continue
-        if tp_percent is None:
+        if active.get(hit_key, False) or tp_percent is None:
             continue
         tp_price = calculate_tp_price(entry, side, tp_percent)
-        hit = high >= tp_price if side == "BUY" else low <= tp_price
-        if not hit:
+        if not (high >= tp_price if side == "BUY" else low <= tp_price):
             continue
-
-        # Trailing rule:
-        # TP1 keeps original SL.
-        # TP2 moves SL to entry.
-        # TP3-TP8 move SL two TP levels back (old behavior).
-        # From TP9 onward SL moves to the immediately previous TP.
-        # TP40 is the final / FULL TP and closes the trade.
         if index == 0:
             new_sl = float(active.get("current_sl", active.get("initial_sl", active["sl"])))
         elif index == 1:
             new_sl = entry
         elif index >= 8:
-            previous_name, previous_percent = levels[index - 1]
+            _, previous_percent = levels[index - 1]
+            if previous_percent is None:
+                continue
             new_sl = calculate_tp_price(entry, side, previous_percent)
         else:
-            previous_name, previous_percent = levels[index - 2]
+            _, previous_percent = levels[index - 2]
             new_sl = calculate_tp_price(entry, side, previous_percent)
-
         delivery_key = f"TP|{info['symbol']}|{active['signal_id']}|{tp_name}"
-        text = tp_text(info, active, tp_name, tp_percent, tp_price, new_sl)
-        if not deliver_once(state, delivery_key, text):
-            save_state(state)
-            return
-
+        # Update trading state BEFORE Telegram.
         active[hit_key] = True
         active["last_tp_hit"] = tp_name
         active.setdefault("tp_hits", []).append({"name": tp_name, "percent": tp_percent, "price": float(tp_price), "time": utc_now(), "new_sl": float(new_sl)})
         active["current_sl"] = float(new_sl)
         active["sl"] = float(new_sl)
         save_state(state)
-
-        print(f"{info['symbol']}: {tp_name} hit at {tp_price:.12g}; SL -> {new_sl:.12g}")
-
         if tp_name == "TP40":
             closed = close_trade(state, info, active, tp_price, "FULL TP (TP40)", df.index[monitor_idx].isoformat())
-            print(f"{info['symbol']}: TP40 / Full TP closed trade #{closed.get('trade_number')}")
+            text = trade_details_text(closed, "🎯 معامله بسته شد روی TP40 / FULL TP")
+        else:
+            text = tp_text(info, active, tp_name, tp_percent, tp_price, new_sl)
+        if not deliver_once(state, delivery_key, text):
+            queue_notification(state, delivery_key, text)
+        else:
+            state.get("pending_notifications", {}).pop(delivery_key, None)
+            save_state(state)
+        print(f"{info['symbol']}: {tp_name} hit at {tp_price:.12g}; SL -> {new_sl:.12g}")
+        if tp_name == "TP40":
             return
-
 
 # =========================================================
 # STOP LOSS CHECK
@@ -2074,17 +1918,10 @@ def check_stop(state, info, df):
     active = state["active"].get(info["symbol"])
     if not active or len(df) < 2:
         return
-
-    # User rule: once TP1 has been reached, never send a later SL message
-    # for that signal. Higher TP levels continue to be monitored.
-    if active.get("tp1_hit", False):
-        return
-
     try:
-        # SL is based on the close of a fully completed 4H candle.
         close = float(df["Close"].iloc[-2])
         sl = float(active.get("current_sl", active.get("sl")))
-        entry = float(active["entry_price"])
+        float(active["entry_price"])
     except (KeyError, TypeError, ValueError):
         print(f"{info['symbol']}: active trade has incomplete pricing data; skipping SL check.")
         return
@@ -2093,15 +1930,16 @@ def check_stop(state, info, df):
         return
     candle_time = df.index[-2].isoformat()
     delivery_key = f"STOP|{info['symbol']}|{active['signal_id']}|{candle_time}|{sl:.12g}"
-    # PnL is calculated once, after the stop notification is successfully delivered.
-    pnl = trade_pnl(float(active["entry_price"]), sl, active["side"], float(active.get("notional", 0.0)))
-    text = stop_text(info, active, sl, pnl)
+    reason = "TRAILING SL" if active.get("last_tp_hit") else "INITIAL SL"
+    # Close and persist first; Telegram can never block accounting.
+    closed = close_trade(state, info, active, sl, reason, candle_time)
+    text = trade_details_text(closed, f"🛑 معامله بسته شد روی {reason}")
     if not deliver_once(state, delivery_key, text):
+        queue_notification(state, delivery_key, text)
+    else:
+        state.get("pending_notifications", {}).pop(delivery_key, None)
         save_state(state)
-        return
-    close_trade(state, info, active, sl, "TRAILING SL" if active.get("last_tp_hit") else "INITIAL SL", candle_time)
-    print(f"Stop loss sent for {info['symbol']} trade #{active.get('trade_number')}")
-
+    print(f"Stop loss processed for {info['symbol']} trade #{closed.get('trade_number')} | balance=${float(closed.get('balance_after', 0)):.2f}")
 
 def portfolio_metrics(state):
     curve = state["portfolio"].get("equity_curve", [])
@@ -2259,7 +2097,7 @@ def get_previous_month():
 
     previous_month_last_day = (
         first_day_current
-        - pd.Timedelta(days=1, unit="D")
+        - pd.Timedelta(days=1)
     )
 
     return previous_month_last_day.strftime(
@@ -2330,7 +2168,7 @@ def previous_week_start():
 
     previous_week = (
         current_week_start
-        - pd.Timedelta(days=7, unit="D")
+        - pd.Timedelta(days=7)
     )
 
     return previous_week.strftime(
@@ -2341,9 +2179,9 @@ def previous_week_start():
 def weekly_report_text(state, week_string):
     try:
         start = datetime.strptime(week_string, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-        end = start + pd.Timedelta(days=7, unit="D")
+        end = start + pd.Timedelta(days=7)
     except Exception:
-        start = utc_datetime() - pd.Timedelta(days=7, unit="D")
+        start = utc_datetime() - pd.Timedelta(days=7)
         end = utc_datetime()
     trades = []
     for t in state.get("closed_trades", []):
@@ -2577,13 +2415,7 @@ def analyze_symbol(state, info, df):
         save_state(state)
         return
 
-    # Initial protection is fixed at 10% from entry, per risk settings.
-    if signal["side"] == "BUY":
-        signal["sl"] = entry_price * 0.90
-    else:
-        signal["sl"] = entry_price * 1.10
-
-    text = signal_text(info, signal, trade_number, margin, notional, state.get("market_boss", {}).get("current"))
+    text = signal_text(info, signal, trade_number, margin, notional)
     # TP1 is the button that reveals TP3 through TP40. TP2 remains visible in the main message.
     reply_markup = {
         "inline_keyboard": [
@@ -2665,21 +2497,10 @@ def find_trade(state, number):
 def main():
 
     state = load_state()
+    flush_pending_notifications(state)
     update_period_openings(state)
     record_equity_point(state, "heartbeat")
     # Telegram commands are handled by the separate command workflow.
-
-    btc_power = None
-    try:
-        btc_df = download_4h("BTCUSDT")
-        btc_power = update_btc_power(state, btc_df)
-        if btc_power:
-            print("BTC MARKET POWER:", btc_power["score"], btc_power["side"], btc_power["phase"], btc_power["trend"])
-            print("BTC POWER COMPONENTS:", btc_power.get("components", {}))
-        else:
-            print("BTC MARKET POWER: unavailable (insufficient completed 4H data)")
-    except Exception as error:
-        print(f"BTC power calculation failed: {error}")
 
     binance_symbols = get_binance_spot_symbols()
 
@@ -2722,6 +2543,7 @@ def main():
     send_daily_report(state)
     send_monthly_report(state)
     send_weekly_report(state)
+    flush_pending_notifications(state)
 
     save_state(state)
 
