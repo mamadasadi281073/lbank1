@@ -14838,6 +14838,11 @@
         "time": "2026-09-21 16:31:19 UTC",
         "balance": 224.5,
         "reason": "trade #207 TRAILING SL"
+      },
+      {
+        "time": "2026-09-21 16:47:15 UTC",
+        "balance": 224.5,
+        "reason": "heartbeat"
       }
     ],
     "total_fees": 0.0
