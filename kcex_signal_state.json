@@ -5822,24 +5822,53 @@
       "signal_id": "SELL|2026-09-21T08:00:00+00:00|393|0.114400000000",
       "side": "SELL",
       "initial_sl": 0.1144,
-      "current_sl": 0.1144,
-      "sl": 0.1144,
+      "current_sl": 0.112112,
+      "sl": 0.112112,
       "entry_price": 0.1144,
       "signal_time": "2026-09-21T08:00:00+00:00",
       "margin": 10.0,
       "notional": 100.0,
       "leverage": 10.0,
-      "tp1_hit": false,
-      "tp2_hit": false,
-      "tp3_hit": false,
-      "tp4_hit": false,
+      "tp1_hit": true,
+      "tp2_hit": true,
+      "tp3_hit": true,
+      "tp4_hit": true,
       "tp5_hit": false,
       "tp6_hit": false,
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "",
-      "tp_hits": [],
+      "last_tp_hit": "TP4",
+      "tp_hits": [
+        {
+          "name": "TP1",
+          "percent": 1.0,
+          "price": 0.113256,
+          "time": "2026-09-21 12:36:43 UTC",
+          "new_sl": 0.1144
+        },
+        {
+          "name": "TP2",
+          "percent": 2.0,
+          "price": 0.112112,
+          "time": "2026-09-21 12:36:44 UTC",
+          "new_sl": 0.1144
+        },
+        {
+          "name": "TP3",
+          "percent": 3.0,
+          "price": 0.110968,
+          "time": "2026-09-21 12:36:44 UTC",
+          "new_sl": 0.113256
+        },
+        {
+          "name": "TP4",
+          "percent": 4.0,
+          "price": 0.10982399999999999,
+          "time": "2026-09-21 12:36:45 UTC",
+          "new_sl": 0.112112
+        }
+      ],
       "balance_at_entry": 209.5,
       "tp9_hit": false,
       "tp10_hit": false,
@@ -5881,24 +5910,53 @@
       "signal_id": "SELL|2026-09-21T08:00:00+00:00|393|11.439000000000",
       "side": "SELL",
       "initial_sl": 11.439,
-      "current_sl": 11.439,
-      "sl": 11.439,
+      "current_sl": 11.21022,
+      "sl": 11.21022,
       "entry_price": 11.439,
       "signal_time": "2026-09-21T08:00:00+00:00",
       "margin": 10.0,
       "notional": 100.0,
       "leverage": 10.0,
-      "tp1_hit": false,
-      "tp2_hit": false,
-      "tp3_hit": false,
-      "tp4_hit": false,
+      "tp1_hit": true,
+      "tp2_hit": true,
+      "tp3_hit": true,
+      "tp4_hit": true,
       "tp5_hit": false,
       "tp6_hit": false,
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "",
-      "tp_hits": [],
+      "last_tp_hit": "TP4",
+      "tp_hits": [
+        {
+          "name": "TP1",
+          "percent": 1.0,
+          "price": 11.32461,
+          "time": "2026-09-21 12:36:45 UTC",
+          "new_sl": 11.439
+        },
+        {
+          "name": "TP2",
+          "percent": 2.0,
+          "price": 11.21022,
+          "time": "2026-09-21 12:36:46 UTC",
+          "new_sl": 11.439
+        },
+        {
+          "name": "TP3",
+          "percent": 3.0,
+          "price": 11.09583,
+          "time": "2026-09-21 12:36:46 UTC",
+          "new_sl": 11.32461
+        },
+        {
+          "name": "TP4",
+          "percent": 4.0,
+          "price": 10.98144,
+          "time": "2026-09-21 12:36:46 UTC",
+          "new_sl": 11.21022
+        }
+      ],
       "balance_at_entry": 213.5,
       "tp9_hit": false,
       "tp10_hit": false,
@@ -5940,24 +5998,53 @@
       "signal_id": "SELL|2026-09-21T08:00:00+00:00|393|0.049400000000",
       "side": "SELL",
       "initial_sl": 0.0494,
-      "current_sl": 0.0494,
-      "sl": 0.0494,
+      "current_sl": 0.048412,
+      "sl": 0.048412,
       "entry_price": 0.0494,
       "signal_time": "2026-09-21T08:00:00+00:00",
       "margin": 10.0,
       "notional": 100.0,
       "leverage": 10.0,
-      "tp1_hit": false,
-      "tp2_hit": false,
-      "tp3_hit": false,
-      "tp4_hit": false,
+      "tp1_hit": true,
+      "tp2_hit": true,
+      "tp3_hit": true,
+      "tp4_hit": true,
       "tp5_hit": false,
       "tp6_hit": false,
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "",
-      "tp_hits": [],
+      "last_tp_hit": "TP4",
+      "tp_hits": [
+        {
+          "name": "TP1",
+          "percent": 1.0,
+          "price": 0.048906,
+          "time": "2026-09-21 12:36:47 UTC",
+          "new_sl": 0.0494
+        },
+        {
+          "name": "TP2",
+          "percent": 2.0,
+          "price": 0.048412,
+          "time": "2026-09-21 12:36:48 UTC",
+          "new_sl": 0.0494
+        },
+        {
+          "name": "TP3",
+          "percent": 3.0,
+          "price": 0.047917999999999995,
+          "time": "2026-09-21 12:36:48 UTC",
+          "new_sl": 0.048906
+        },
+        {
+          "name": "TP4",
+          "percent": 4.0,
+          "price": 0.047424,
+          "time": "2026-09-21 12:36:48 UTC",
+          "new_sl": 0.048412
+        }
+      ],
       "balance_at_entry": 214.5,
       "tp9_hit": false,
       "tp10_hit": false,
@@ -13381,6 +13468,42 @@
     },
     "STOP|PYTHUSDT|BUY|2026-09-20T00:00:00+00:00|393|0.059130000000|2026-09-21T04:00:00+00:00|0.0614952": {
       "1448700069": true
+    },
+    "TP|ALGOUSDT|SELL|2026-09-21T08:00:00+00:00|393|0.114400000000|TP1": {
+      "1448700069": true
+    },
+    "TP|ALGOUSDT|SELL|2026-09-21T08:00:00+00:00|393|0.114400000000|TP2": {
+      "1448700069": true
+    },
+    "TP|ALGOUSDT|SELL|2026-09-21T08:00:00+00:00|393|0.114400000000|TP3": {
+      "1448700069": true
+    },
+    "TP|ALGOUSDT|SELL|2026-09-21T08:00:00+00:00|393|0.114400000000|TP4": {
+      "1448700069": true
+    },
+    "TP|AVAXUSDT|SELL|2026-09-21T08:00:00+00:00|393|11.439000000000|TP1": {
+      "1448700069": true
+    },
+    "TP|AVAXUSDT|SELL|2026-09-21T08:00:00+00:00|393|11.439000000000|TP2": {
+      "1448700069": true
+    },
+    "TP|AVAXUSDT|SELL|2026-09-21T08:00:00+00:00|393|11.439000000000|TP3": {
+      "1448700069": true
+    },
+    "TP|AVAXUSDT|SELL|2026-09-21T08:00:00+00:00|393|11.439000000000|TP4": {
+      "1448700069": true
+    },
+    "TP|IOTAUSDT|SELL|2026-09-21T08:00:00+00:00|393|0.049400000000|TP1": {
+      "1448700069": true
+    },
+    "TP|IOTAUSDT|SELL|2026-09-21T08:00:00+00:00|393|0.049400000000|TP2": {
+      "1448700069": true
+    },
+    "TP|IOTAUSDT|SELL|2026-09-21T08:00:00+00:00|393|0.049400000000|TP3": {
+      "1448700069": true
+    },
+    "TP|IOTAUSDT|SELL|2026-09-21T08:00:00+00:00|393|0.049400000000|TP4": {
+      "1448700069": true
     }
   },
   "daily_stats": {
@@ -14263,6 +14386,11 @@
         "time": "2026-09-21 12:18:38 UTC",
         "balance": 217.5,
         "reason": "trade #146 TRAILING SL"
+      },
+      {
+        "time": "2026-09-21 12:36:29 UTC",
+        "balance": 217.5,
+        "reason": "heartbeat"
       }
     ],
     "total_fees": 0.0
