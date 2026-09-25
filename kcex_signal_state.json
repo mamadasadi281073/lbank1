@@ -4298,24 +4298,46 @@
       "signal_id": "SELL|2026-09-24T20:00:00+00:00|394|0.082800000000",
       "side": "SELL",
       "initial_sl": 0.0828,
-      "current_sl": 0.0828,
-      "sl": 0.0828,
+      "current_sl": 0.081972,
+      "sl": 0.081972,
       "entry_price": 0.0828,
       "signal_time": "2026-09-24T20:00:00+00:00",
       "margin": 10.0,
       "notional": 100.0,
       "leverage": 10.0,
-      "tp1_hit": false,
-      "tp2_hit": false,
-      "tp3_hit": false,
+      "tp1_hit": true,
+      "tp2_hit": true,
+      "tp3_hit": true,
       "tp4_hit": false,
       "tp5_hit": false,
       "tp6_hit": false,
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "",
-      "tp_hits": [],
+      "last_tp_hit": "TP3",
+      "tp_hits": [
+        {
+          "name": "TP1",
+          "percent": 1.0,
+          "price": 0.081972,
+          "time": "2026-09-25 00:47:55 UTC",
+          "new_sl": 0.0828
+        },
+        {
+          "name": "TP2",
+          "percent": 2.0,
+          "price": 0.081144,
+          "time": "2026-09-25 00:47:56 UTC",
+          "new_sl": 0.0828
+        },
+        {
+          "name": "TP3",
+          "percent": 3.0,
+          "price": 0.080316,
+          "time": "2026-09-25 00:47:56 UTC",
+          "new_sl": 0.081972
+        }
+      ],
       "balance_at_entry": 489.0,
       "tp9_hit": false,
       "tp10_hit": false,
@@ -24176,6 +24198,15 @@
     },
     "STOP|PENDLEUSDT|SELL|2026-09-24T12:00:00+00:00|393|2.600000000000|2026-09-24T16:00:00+00:00|2.522": {
       "1448700069": true
+    },
+    "TP|CUSDT|SELL|2026-09-24T20:00:00+00:00|394|0.082800000000|TP1": {
+      "1448700069": true
+    },
+    "TP|CUSDT|SELL|2026-09-24T20:00:00+00:00|394|0.082800000000|TP2": {
+      "1448700069": true
+    },
+    "TP|CUSDT|SELL|2026-09-24T20:00:00+00:00|394|0.082800000000|TP3": {
+      "1448700069": true
     }
   },
   "daily_stats": {
@@ -26595,6 +26626,11 @@
         "time": "2026-09-25 00:27:08 UTC",
         "balance": 491.0,
         "reason": "trade #342 TRAILING SL"
+      },
+      {
+        "time": "2026-09-25 00:47:44 UTC",
+        "balance": 491.0,
+        "reason": "heartbeat"
       }
     ],
     "total_fees": 0.0
