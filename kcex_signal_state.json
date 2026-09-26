@@ -5605,65 +5605,6 @@
       "tp39_hit": false,
       "tp40_hit": false
     },
-    "RAYUSDT": {
-      "trade_number": 415,
-      "symbol": "RAYUSDT",
-      "name": "RAY",
-      "signal_id": "BUY|2026-09-25T20:00:00+00:00|394|2.011600000000",
-      "side": "BUY",
-      "initial_sl": 2.0116,
-      "current_sl": 2.0116,
-      "sl": 2.0116,
-      "entry_price": 2.0116,
-      "signal_time": "2026-09-25T20:00:00+00:00",
-      "margin": 10.0,
-      "notional": 100.0,
-      "leverage": 10.0,
-      "tp1_hit": false,
-      "tp2_hit": false,
-      "tp3_hit": false,
-      "tp4_hit": false,
-      "tp5_hit": false,
-      "tp6_hit": false,
-      "tp7_hit": false,
-      "tp8_hit": false,
-      "full_tp_hit": false,
-      "last_tp_hit": "",
-      "tp_hits": [],
-      "balance_at_entry": 592.0,
-      "tp9_hit": false,
-      "tp10_hit": false,
-      "tp11_hit": false,
-      "tp12_hit": false,
-      "tp13_hit": false,
-      "tp14_hit": false,
-      "tp15_hit": false,
-      "tp16_hit": false,
-      "tp17_hit": false,
-      "tp18_hit": false,
-      "tp19_hit": false,
-      "tp20_hit": false,
-      "tp21_hit": false,
-      "tp22_hit": false,
-      "tp23_hit": false,
-      "tp24_hit": false,
-      "tp25_hit": false,
-      "tp26_hit": false,
-      "tp27_hit": false,
-      "tp28_hit": false,
-      "tp29_hit": false,
-      "tp30_hit": false,
-      "tp31_hit": false,
-      "tp32_hit": false,
-      "tp33_hit": false,
-      "tp34_hit": false,
-      "tp35_hit": false,
-      "tp36_hit": false,
-      "tp37_hit": false,
-      "tp38_hit": false,
-      "tp39_hit": false,
-      "tp40_hit": false
-    },
     "FLUXUSDT": {
       "trade_number": 416,
       "symbol": "FLUXUSDT",
@@ -5671,24 +5612,46 @@
       "signal_id": "BUY|2026-09-25T20:00:00+00:00|393|0.067700000000",
       "side": "BUY",
       "initial_sl": 0.0677,
-      "current_sl": 0.0677,
-      "sl": 0.0677,
+      "current_sl": 0.068377,
+      "sl": 0.068377,
       "entry_price": 0.0677,
       "signal_time": "2026-09-25T20:00:00+00:00",
       "margin": 10.0,
       "notional": 100.0,
       "leverage": 10.0,
-      "tp1_hit": false,
-      "tp2_hit": false,
-      "tp3_hit": false,
+      "tp1_hit": true,
+      "tp2_hit": true,
+      "tp3_hit": true,
       "tp4_hit": false,
       "tp5_hit": false,
       "tp6_hit": false,
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "",
-      "tp_hits": [],
+      "last_tp_hit": "TP3",
+      "tp_hits": [
+        {
+          "name": "TP1",
+          "percent": 1.0,
+          "price": 0.068377,
+          "time": "2026-09-26 00:43:13 UTC",
+          "new_sl": 0.0677
+        },
+        {
+          "name": "TP2",
+          "percent": 2.0,
+          "price": 0.069054,
+          "time": "2026-09-26 00:43:13 UTC",
+          "new_sl": 0.0677
+        },
+        {
+          "name": "TP3",
+          "percent": 3.0,
+          "price": 0.069731,
+          "time": "2026-09-26 00:43:14 UTC",
+          "new_sl": 0.068377
+        }
+      ],
       "balance_at_entry": 592.0,
       "tp9_hit": false,
       "tp10_hit": false,
@@ -22385,6 +22348,69 @@
       "current_sl": 1.435,
       "initial_balance": 571.0,
       "balance_at_entry": 571.0
+    },
+    {
+      "trade_number": 415,
+      "symbol": "RAYUSDT",
+      "name": "RAY",
+      "side": "BUY",
+      "signal_id": "BUY|2026-09-25T20:00:00+00:00|394|2.011600000000",
+      "signal_time": "2026-09-25T20:00:00+00:00",
+      "entry_price": 2.0116,
+      "exit_price": 2.071948,
+      "initial_sl": 2.0116,
+      "margin": 10.0,
+      "notional": 100.0,
+      "leverage": 10.0,
+      "gross_pnl": 2.9999999999999925,
+      "fee": 1.0,
+      "pnl": 1.9999999999999925,
+      "balance_before": 591.0,
+      "balance_after": 593.0,
+      "reason": "TRAILING SL",
+      "exit_time": "2026-09-26 00:43:12 UTC",
+      "candle_time": "2026-09-25T16:00:00+00:00",
+      "last_tp_hit": "TP5",
+      "tp_hits": [
+        {
+          "name": "TP1",
+          "percent": 1.0,
+          "price": 2.031716,
+          "time": "2026-09-26 00:43:10 UTC",
+          "new_sl": 2.0116
+        },
+        {
+          "name": "TP2",
+          "percent": 2.0,
+          "price": 2.051832,
+          "time": "2026-09-26 00:43:11 UTC",
+          "new_sl": 2.0116
+        },
+        {
+          "name": "TP3",
+          "percent": 3.0,
+          "price": 2.071948,
+          "time": "2026-09-26 00:43:11 UTC",
+          "new_sl": 2.031716
+        },
+        {
+          "name": "TP4",
+          "percent": 4.0,
+          "price": 2.092064,
+          "time": "2026-09-26 00:43:12 UTC",
+          "new_sl": 2.051832
+        },
+        {
+          "name": "TP5",
+          "percent": 5.0,
+          "price": 2.11218,
+          "time": "2026-09-26 00:43:12 UTC",
+          "new_sl": 2.071948
+        }
+      ],
+      "current_sl": 2.071948,
+      "initial_balance": 592.0,
+      "balance_at_entry": 592.0
     }
   ],
   "deliveries": {
@@ -29194,6 +29220,33 @@
     },
     "TP|WIFUSDT|BUY|2026-09-25T04:00:00+00:00|393|0.229300000000|TP7": {
       "1448700069": true
+    },
+    "TP|RAYUSDT|BUY|2026-09-25T20:00:00+00:00|394|2.011600000000|TP1": {
+      "1448700069": true
+    },
+    "TP|RAYUSDT|BUY|2026-09-25T20:00:00+00:00|394|2.011600000000|TP2": {
+      "1448700069": true
+    },
+    "TP|RAYUSDT|BUY|2026-09-25T20:00:00+00:00|394|2.011600000000|TP3": {
+      "1448700069": true
+    },
+    "TP|RAYUSDT|BUY|2026-09-25T20:00:00+00:00|394|2.011600000000|TP4": {
+      "1448700069": true
+    },
+    "TP|RAYUSDT|BUY|2026-09-25T20:00:00+00:00|394|2.011600000000|TP5": {
+      "1448700069": true
+    },
+    "STOP|RAYUSDT|BUY|2026-09-25T20:00:00+00:00|394|2.011600000000|2026-09-25T16:00:00+00:00|2.071948": {
+      "1448700069": true
+    },
+    "TP|FLUXUSDT|BUY|2026-09-25T20:00:00+00:00|393|0.067700000000|TP1": {
+      "1448700069": true
+    },
+    "TP|FLUXUSDT|BUY|2026-09-25T20:00:00+00:00|393|0.067700000000|TP2": {
+      "1448700069": true
+    },
+    "TP|FLUXUSDT|BUY|2026-09-25T20:00:00+00:00|393|0.067700000000|TP3": {
+      "1448700069": true
     }
   },
   "daily_stats": {
@@ -29788,7 +29841,7 @@
     },
     "2026-09-25": {
       "signals": 66,
-      "tp_wins": 18,
+      "tp_wins": 19,
       "sl_losses": 13,
       "signal_ids": [
         "SELL|2026-09-25T00:00:00+00:00|393|0.003060000000",
@@ -29876,7 +29929,8 @@
         "BUY|2026-09-25T12:00:00+00:00|394|0.087380000000",
         "BUY|2026-09-25T12:00:00+00:00|394|0.327900000000",
         "BUY|2026-09-25T12:00:00+00:00|394|2.594000000000",
-        "BUY|2026-09-25T08:00:00+00:00|393|0.029630000000"
+        "BUY|2026-09-25T08:00:00+00:00|393|0.029630000000",
+        "BUY|2026-09-25T20:00:00+00:00|394|2.011600000000"
       ],
       "sl_signal_ids": [
         "SELL|2026-09-25T08:00:00+00:00|393|0.016170000000",
@@ -29898,7 +29952,7 @@
   "monthly_stats": {
     "2026-09": {
       "signals": 338,
-      "tp_wins": 168,
+      "tp_wins": 169,
       "sl_losses": 57,
       "signal_ids": [
         "SELL|2026-09-15T08:00:00+00:00|394|0.013000000000",
@@ -30408,7 +30462,8 @@
         "BUY|2026-09-25T12:00:00+00:00|394|0.087380000000",
         "BUY|2026-09-25T12:00:00+00:00|394|0.327900000000",
         "BUY|2026-09-25T12:00:00+00:00|394|2.594000000000",
-        "BUY|2026-09-25T08:00:00+00:00|393|0.029630000000"
+        "BUY|2026-09-25T08:00:00+00:00|393|0.029630000000",
+        "BUY|2026-09-25T20:00:00+00:00|394|2.011600000000"
       ],
       "sl_signal_ids": [
         "SELL|2026-09-17T04:00:00+00:00|393|0.002850000000",
@@ -30473,9 +30528,9 @@
   },
   "portfolio": {
     "initial_balance": 100.0,
-    "balance": 591.0,
+    "balance": 593.0,
     "next_trade_number": 417,
-    "total_realized_pnl": 491.00000000000006,
+    "total_realized_pnl": 493.00000000000006,
     "period_opening_balances": {
       "DAY|2026-09-12": 100.0,
       "MONTH|2026-09": 100.0,
@@ -32102,6 +32157,16 @@
         "time": "2026-09-26 00:22:17 UTC",
         "balance": 591.0,
         "reason": "trade #378 TRAILING SL"
+      },
+      {
+        "time": "2026-09-26 00:42:58 UTC",
+        "balance": 591.0,
+        "reason": "heartbeat"
+      },
+      {
+        "time": "2026-09-26 00:43:12 UTC",
+        "balance": 593.0,
+        "reason": "trade #415 TRAILING SL"
       }
     ],
     "total_fees": 0.0
@@ -32668,7 +32733,7 @@
     },
     "2026-09-21": {
       "signals": 221,
-      "tp_wins": 110,
+      "tp_wins": 111,
       "sl_losses": 42,
       "signal_ids": [
         "BUY|2026-09-21T00:00:00+00:00|394|0.040920000000",
@@ -33003,7 +33068,8 @@
         "BUY|2026-09-25T12:00:00+00:00|394|0.087380000000",
         "BUY|2026-09-25T12:00:00+00:00|394|0.327900000000",
         "BUY|2026-09-25T12:00:00+00:00|394|2.594000000000",
-        "BUY|2026-09-25T08:00:00+00:00|393|0.029630000000"
+        "BUY|2026-09-25T08:00:00+00:00|393|0.029630000000",
+        "BUY|2026-09-25T20:00:00+00:00|394|2.011600000000"
       ],
       "sl_signal_ids": [
         "SELL|2026-09-21T16:00:00+00:00|393|0.336400000000",
