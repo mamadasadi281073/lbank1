@@ -39752,6 +39752,11 @@
         "time": "2026-09-27 12:26:05 UTC",
         "balance": 640.0,
         "reason": "trade #492 TRAILING SL"
+      },
+      {
+        "time": "2026-09-27 12:46:51 UTC",
+        "balance": 640.0,
+        "reason": "heartbeat"
       }
     ],
     "total_fees": 0.0
