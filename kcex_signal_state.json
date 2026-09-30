@@ -56400,6 +56400,11 @@
         "time": "2026-09-30 16:28:41 UTC",
         "balance": 908.0,
         "reason": "trade #711 TRAILING SL"
+      },
+      {
+        "time": "2026-09-30 16:48:14 UTC",
+        "balance": 908.0,
+        "reason": "heartbeat"
       }
     ],
     "total_fees": 0.0
