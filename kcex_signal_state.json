@@ -62578,6 +62578,11 @@
         "time": "2026-10-01 16:23:33 UTC",
         "balance": 961.0,
         "reason": "trade #782 TRAILING SL"
+      },
+      {
+        "time": "2026-10-01 16:41:38 UTC",
+        "balance": 961.0,
+        "reason": "heartbeat"
       }
     ],
     "total_fees": 0.0
