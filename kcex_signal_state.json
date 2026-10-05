@@ -81941,6 +81941,11 @@
         "time": "2026-10-05 08:48:43 UTC",
         "balance": 1208.5,
         "reason": "trade #1022 TRAILING SL"
+      },
+      {
+        "time": "2026-10-05 09:03:50 UTC",
+        "balance": 1208.5,
+        "reason": "heartbeat"
       }
     ],
     "total_fees": 0.0
