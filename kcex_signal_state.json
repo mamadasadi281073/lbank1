@@ -6676,8 +6676,8 @@
       "margin": 10.0,
       "notional": 100.0,
       "leverage": 10.0,
-      "tp1_hit": false,
-      "tp2_hit": false,
+      "tp1_hit": true,
+      "tp2_hit": true,
       "tp3_hit": false,
       "tp4_hit": false,
       "tp5_hit": false,
@@ -6685,8 +6685,23 @@
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "",
-      "tp_hits": [],
+      "last_tp_hit": "TP2",
+      "tp_hits": [
+        {
+          "name": "TP1",
+          "percent": 1.0,
+          "price": 0.0320675,
+          "time": "2026-10-06 00:55:28 UTC",
+          "new_sl": 0.03175
+        },
+        {
+          "name": "TP2",
+          "percent": 2.0,
+          "price": 0.032385000000000004,
+          "time": "2026-10-06 00:55:29 UTC",
+          "new_sl": 0.03175
+        }
+      ],
       "balance_at_entry": 1216.5,
       "tp9_hit": false,
       "tp10_hit": false,
@@ -6735,8 +6750,8 @@
       "margin": 10.0,
       "notional": 100.0,
       "leverage": 10.0,
-      "tp1_hit": false,
-      "tp2_hit": false,
+      "tp1_hit": true,
+      "tp2_hit": true,
       "tp3_hit": false,
       "tp4_hit": false,
       "tp5_hit": false,
@@ -6744,8 +6759,23 @@
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "",
-      "tp_hits": [],
+      "last_tp_hit": "TP2",
+      "tp_hits": [
+        {
+          "name": "TP1",
+          "percent": 1.0,
+          "price": 0.00062115,
+          "time": "2026-10-06 00:55:29 UTC",
+          "new_sl": 0.000615
+        },
+        {
+          "name": "TP2",
+          "percent": 2.0,
+          "price": 0.0006273,
+          "time": "2026-10-06 00:55:30 UTC",
+          "new_sl": 0.000615
+        }
+      ],
       "balance_at_entry": 1216.5,
       "tp9_hit": false,
       "tp10_hit": false,
@@ -6787,24 +6817,46 @@
       "signal_id": "SELL|2026-10-05T20:00:00+00:00|394|0.020490000000",
       "side": "SELL",
       "initial_sl": 0.02049,
-      "current_sl": 0.02049,
-      "sl": 0.02049,
+      "current_sl": 0.0202851,
+      "sl": 0.0202851,
       "entry_price": 0.02049,
       "signal_time": "2026-10-05T20:00:00+00:00",
       "margin": 10.0,
       "notional": 100.0,
       "leverage": 10.0,
-      "tp1_hit": false,
-      "tp2_hit": false,
-      "tp3_hit": false,
+      "tp1_hit": true,
+      "tp2_hit": true,
+      "tp3_hit": true,
       "tp4_hit": false,
       "tp5_hit": false,
       "tp6_hit": false,
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "",
-      "tp_hits": [],
+      "last_tp_hit": "TP3",
+      "tp_hits": [
+        {
+          "name": "TP1",
+          "percent": 1.0,
+          "price": 0.0202851,
+          "time": "2026-10-06 00:55:30 UTC",
+          "new_sl": 0.02049
+        },
+        {
+          "name": "TP2",
+          "percent": 2.0,
+          "price": 0.0200802,
+          "time": "2026-10-06 00:55:31 UTC",
+          "new_sl": 0.02049
+        },
+        {
+          "name": "TP3",
+          "percent": 3.0,
+          "price": 0.019875300000000002,
+          "time": "2026-10-06 00:55:32 UTC",
+          "new_sl": 0.0202851
+        }
+      ],
       "balance_at_entry": 1216.5,
       "tp9_hit": false,
       "tp10_hit": false,
@@ -6846,24 +6898,53 @@
       "signal_id": "BUY|2026-10-05T20:00:00+00:00|393|0.201500000000",
       "side": "BUY",
       "initial_sl": 0.2015,
-      "current_sl": 0.2015,
-      "sl": 0.2015,
+      "current_sl": 0.20553000000000002,
+      "sl": 0.20553000000000002,
       "entry_price": 0.2015,
       "signal_time": "2026-10-05T20:00:00+00:00",
       "margin": 10.0,
       "notional": 100.0,
       "leverage": 10.0,
-      "tp1_hit": false,
-      "tp2_hit": false,
-      "tp3_hit": false,
-      "tp4_hit": false,
+      "tp1_hit": true,
+      "tp2_hit": true,
+      "tp3_hit": true,
+      "tp4_hit": true,
       "tp5_hit": false,
       "tp6_hit": false,
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "",
-      "tp_hits": [],
+      "last_tp_hit": "TP4",
+      "tp_hits": [
+        {
+          "name": "TP1",
+          "percent": 1.0,
+          "price": 0.203515,
+          "time": "2026-10-06 00:55:32 UTC",
+          "new_sl": 0.2015
+        },
+        {
+          "name": "TP2",
+          "percent": 2.0,
+          "price": 0.20553000000000002,
+          "time": "2026-10-06 00:55:33 UTC",
+          "new_sl": 0.2015
+        },
+        {
+          "name": "TP3",
+          "percent": 3.0,
+          "price": 0.207545,
+          "time": "2026-10-06 00:55:33 UTC",
+          "new_sl": 0.203515
+        },
+        {
+          "name": "TP4",
+          "percent": 4.0,
+          "price": 0.20956000000000002,
+          "time": "2026-10-06 00:55:34 UTC",
+          "new_sl": 0.20553000000000002
+        }
+      ],
       "balance_at_entry": 1218.5,
       "tp9_hit": false,
       "tp10_hit": false,
@@ -6905,84 +6986,61 @@
       "signal_id": "BUY|2026-10-05T20:00:00+00:00|393|4.440000000000",
       "side": "BUY",
       "initial_sl": 4.44,
-      "current_sl": 4.44,
-      "sl": 4.44,
+      "current_sl": 4.573200000000001,
+      "sl": 4.573200000000001,
       "entry_price": 4.44,
       "signal_time": "2026-10-05T20:00:00+00:00",
       "margin": 10.0,
       "notional": 100.0,
       "leverage": 10.0,
-      "tp1_hit": false,
-      "tp2_hit": false,
-      "tp3_hit": false,
-      "tp4_hit": false,
-      "tp5_hit": false,
+      "tp1_hit": true,
+      "tp2_hit": true,
+      "tp3_hit": true,
+      "tp4_hit": true,
+      "tp5_hit": true,
       "tp6_hit": false,
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "",
-      "tp_hits": [],
+      "last_tp_hit": "TP5",
+      "tp_hits": [
+        {
+          "name": "TP1",
+          "percent": 1.0,
+          "price": 4.484400000000001,
+          "time": "2026-10-06 00:55:34 UTC",
+          "new_sl": 4.44
+        },
+        {
+          "name": "TP2",
+          "percent": 2.0,
+          "price": 4.5288,
+          "time": "2026-10-06 00:55:35 UTC",
+          "new_sl": 4.44
+        },
+        {
+          "name": "TP3",
+          "percent": 3.0,
+          "price": 4.573200000000001,
+          "time": "2026-10-06 00:55:35 UTC",
+          "new_sl": 4.484400000000001
+        },
+        {
+          "name": "TP4",
+          "percent": 4.0,
+          "price": 4.6176,
+          "time": "2026-10-06 00:55:36 UTC",
+          "new_sl": 4.5288
+        },
+        {
+          "name": "TP5",
+          "percent": 5.0,
+          "price": 4.662000000000001,
+          "time": "2026-10-06 00:55:37 UTC",
+          "new_sl": 4.573200000000001
+        }
+      ],
       "balance_at_entry": 1218.5,
-      "tp9_hit": false,
-      "tp10_hit": false,
-      "tp11_hit": false,
-      "tp12_hit": false,
-      "tp13_hit": false,
-      "tp14_hit": false,
-      "tp15_hit": false,
-      "tp16_hit": false,
-      "tp17_hit": false,
-      "tp18_hit": false,
-      "tp19_hit": false,
-      "tp20_hit": false,
-      "tp21_hit": false,
-      "tp22_hit": false,
-      "tp23_hit": false,
-      "tp24_hit": false,
-      "tp25_hit": false,
-      "tp26_hit": false,
-      "tp27_hit": false,
-      "tp28_hit": false,
-      "tp29_hit": false,
-      "tp30_hit": false,
-      "tp31_hit": false,
-      "tp32_hit": false,
-      "tp33_hit": false,
-      "tp34_hit": false,
-      "tp35_hit": false,
-      "tp36_hit": false,
-      "tp37_hit": false,
-      "tp38_hit": false,
-      "tp39_hit": false,
-      "tp40_hit": false
-    },
-    "JTOUSDT": {
-      "trade_number": 1066,
-      "symbol": "JTOUSDT",
-      "name": "JTO",
-      "signal_id": "BUY|2026-10-05T20:00:00+00:00|393|0.564400000000",
-      "side": "BUY",
-      "initial_sl": 0.5644,
-      "current_sl": 0.5644,
-      "sl": 0.5644,
-      "entry_price": 0.5644,
-      "signal_time": "2026-10-05T20:00:00+00:00",
-      "margin": 10.0,
-      "notional": 100.0,
-      "leverage": 10.0,
-      "tp1_hit": false,
-      "tp2_hit": false,
-      "tp3_hit": false,
-      "tp4_hit": false,
-      "tp5_hit": false,
-      "tp6_hit": false,
-      "tp7_hit": false,
-      "tp8_hit": false,
-      "full_tp_hit": false,
-      "last_tp_hit": "",
-      "tp_hits": [],
-      "balance_at_entry": 1220.5,
       "tp9_hit": false,
       "tp10_hit": false,
       "tp11_hit": false,
@@ -7023,24 +7081,46 @@
       "signal_id": "BUY|2026-10-05T20:00:00+00:00|393|0.000028570000",
       "side": "BUY",
       "initial_sl": 2.857e-05,
-      "current_sl": 2.857e-05,
-      "sl": 2.857e-05,
+      "current_sl": 2.88557e-05,
+      "sl": 2.88557e-05,
       "entry_price": 2.857e-05,
       "signal_time": "2026-10-05T20:00:00+00:00",
       "margin": 10.0,
       "notional": 100.0,
       "leverage": 10.0,
-      "tp1_hit": false,
-      "tp2_hit": false,
-      "tp3_hit": false,
+      "tp1_hit": true,
+      "tp2_hit": true,
+      "tp3_hit": true,
       "tp4_hit": false,
       "tp5_hit": false,
       "tp6_hit": false,
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "",
-      "tp_hits": [],
+      "last_tp_hit": "TP3",
+      "tp_hits": [
+        {
+          "name": "TP1",
+          "percent": 1.0,
+          "price": 2.88557e-05,
+          "time": "2026-10-06 00:55:39 UTC",
+          "new_sl": 2.857e-05
+        },
+        {
+          "name": "TP2",
+          "percent": 2.0,
+          "price": 2.91414e-05,
+          "time": "2026-10-06 00:55:40 UTC",
+          "new_sl": 2.857e-05
+        },
+        {
+          "name": "TP3",
+          "percent": 3.0,
+          "price": 2.94271e-05,
+          "time": "2026-10-06 00:55:40 UTC",
+          "new_sl": 2.88557e-05
+        }
+      ],
       "balance_at_entry": 1220.5,
       "tp9_hit": false,
       "tp10_hit": false,
@@ -7089,7 +7169,7 @@
       "margin": 10.0,
       "notional": 100.0,
       "leverage": 10.0,
-      "tp1_hit": false,
+      "tp1_hit": true,
       "tp2_hit": false,
       "tp3_hit": false,
       "tp4_hit": false,
@@ -7098,8 +7178,16 @@
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "",
-      "tp_hits": [],
+      "last_tp_hit": "TP1",
+      "tp_hits": [
+        {
+          "name": "TP1",
+          "percent": 1.0,
+          "price": 0.055045000000000004,
+          "time": "2026-10-06 00:55:41 UTC",
+          "new_sl": 0.0545
+        }
+      ],
       "balance_at_entry": 1220.5,
       "tp9_hit": false,
       "tp10_hit": false,
@@ -7148,7 +7236,7 @@
       "margin": 10.0,
       "notional": 100.0,
       "leverage": 10.0,
-      "tp1_hit": false,
+      "tp1_hit": true,
       "tp2_hit": false,
       "tp3_hit": false,
       "tp4_hit": false,
@@ -7157,67 +7245,16 @@
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "",
-      "tp_hits": [],
-      "balance_at_entry": 1220.5,
-      "tp9_hit": false,
-      "tp10_hit": false,
-      "tp11_hit": false,
-      "tp12_hit": false,
-      "tp13_hit": false,
-      "tp14_hit": false,
-      "tp15_hit": false,
-      "tp16_hit": false,
-      "tp17_hit": false,
-      "tp18_hit": false,
-      "tp19_hit": false,
-      "tp20_hit": false,
-      "tp21_hit": false,
-      "tp22_hit": false,
-      "tp23_hit": false,
-      "tp24_hit": false,
-      "tp25_hit": false,
-      "tp26_hit": false,
-      "tp27_hit": false,
-      "tp28_hit": false,
-      "tp29_hit": false,
-      "tp30_hit": false,
-      "tp31_hit": false,
-      "tp32_hit": false,
-      "tp33_hit": false,
-      "tp34_hit": false,
-      "tp35_hit": false,
-      "tp36_hit": false,
-      "tp37_hit": false,
-      "tp38_hit": false,
-      "tp39_hit": false,
-      "tp40_hit": false
-    },
-    "IMXUSDT": {
-      "trade_number": 1070,
-      "symbol": "IMXUSDT",
-      "name": "IMX",
-      "signal_id": "BUY|2026-10-05T20:00:00+00:00|393|0.181800000000",
-      "side": "BUY",
-      "initial_sl": 0.1818,
-      "current_sl": 0.1818,
-      "sl": 0.1818,
-      "entry_price": 0.1818,
-      "signal_time": "2026-10-05T20:00:00+00:00",
-      "margin": 10.0,
-      "notional": 100.0,
-      "leverage": 10.0,
-      "tp1_hit": false,
-      "tp2_hit": false,
-      "tp3_hit": false,
-      "tp4_hit": false,
-      "tp5_hit": false,
-      "tp6_hit": false,
-      "tp7_hit": false,
-      "tp8_hit": false,
-      "full_tp_hit": false,
-      "last_tp_hit": "",
-      "tp_hits": [],
+      "last_tp_hit": "TP1",
+      "tp_hits": [
+        {
+          "name": "TP1",
+          "percent": 1.0,
+          "price": 0.058479,
+          "time": "2026-10-06 00:55:42 UTC",
+          "new_sl": 0.0579
+        }
+      ],
       "balance_at_entry": 1220.5,
       "tp9_hit": false,
       "tp10_hit": false,
@@ -7259,24 +7296,46 @@
       "signal_id": "BUY|2026-10-05T20:00:00+00:00|393|0.228600000000",
       "side": "BUY",
       "initial_sl": 0.2286,
-      "current_sl": 0.2286,
-      "sl": 0.2286,
+      "current_sl": 0.230886,
+      "sl": 0.230886,
       "entry_price": 0.2286,
       "signal_time": "2026-10-05T20:00:00+00:00",
       "margin": 10.0,
       "notional": 100.0,
       "leverage": 10.0,
-      "tp1_hit": false,
-      "tp2_hit": false,
-      "tp3_hit": false,
+      "tp1_hit": true,
+      "tp2_hit": true,
+      "tp3_hit": true,
       "tp4_hit": false,
       "tp5_hit": false,
       "tp6_hit": false,
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "",
-      "tp_hits": [],
+      "last_tp_hit": "TP3",
+      "tp_hits": [
+        {
+          "name": "TP1",
+          "percent": 1.0,
+          "price": 0.230886,
+          "time": "2026-10-06 00:55:44 UTC",
+          "new_sl": 0.2286
+        },
+        {
+          "name": "TP2",
+          "percent": 2.0,
+          "price": 0.233172,
+          "time": "2026-10-06 00:55:45 UTC",
+          "new_sl": 0.2286
+        },
+        {
+          "name": "TP3",
+          "percent": 3.0,
+          "price": 0.235458,
+          "time": "2026-10-06 00:55:45 UTC",
+          "new_sl": 0.230886
+        }
+      ],
       "balance_at_entry": 1220.5,
       "tp9_hit": false,
       "tp10_hit": false,
@@ -7325,8 +7384,8 @@
       "margin": 10.0,
       "notional": 100.0,
       "leverage": 10.0,
-      "tp1_hit": false,
-      "tp2_hit": false,
+      "tp1_hit": true,
+      "tp2_hit": true,
       "tp3_hit": false,
       "tp4_hit": false,
       "tp5_hit": false,
@@ -7334,8 +7393,23 @@
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "",
-      "tp_hits": [],
+      "last_tp_hit": "TP2",
+      "tp_hits": [
+        {
+          "name": "TP1",
+          "percent": 1.0,
+          "price": 5.2217,
+          "time": "2026-10-06 00:55:46 UTC",
+          "new_sl": 5.17
+        },
+        {
+          "name": "TP2",
+          "percent": 2.0,
+          "price": 5.2734,
+          "time": "2026-10-06 00:55:46 UTC",
+          "new_sl": 5.17
+        }
+      ],
       "balance_at_entry": 1219.5,
       "tp9_hit": false,
       "tp10_hit": false,
@@ -7384,8 +7458,8 @@
       "margin": 10.0,
       "notional": 100.0,
       "leverage": 10.0,
-      "tp1_hit": false,
-      "tp2_hit": false,
+      "tp1_hit": true,
+      "tp2_hit": true,
       "tp3_hit": false,
       "tp4_hit": false,
       "tp5_hit": false,
@@ -7393,8 +7467,23 @@
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "",
-      "tp_hits": [],
+      "last_tp_hit": "TP2",
+      "tp_hits": [
+        {
+          "name": "TP1",
+          "percent": 1.0,
+          "price": 0.253813,
+          "time": "2026-10-06 00:55:47 UTC",
+          "new_sl": 0.2513
+        },
+        {
+          "name": "TP2",
+          "percent": 2.0,
+          "price": 0.25632600000000005,
+          "time": "2026-10-06 00:55:47 UTC",
+          "new_sl": 0.2513
+        }
+      ],
       "balance_at_entry": 1219.5,
       "tp9_hit": false,
       "tp10_hit": false,
@@ -58344,6 +58433,104 @@
       "current_sl": 0.05443,
       "initial_balance": 1216.5,
       "balance_at_entry": 1216.5
+    },
+    {
+      "trade_number": 1066,
+      "symbol": "JTOUSDT",
+      "name": "JTO",
+      "side": "BUY",
+      "signal_id": "BUY|2026-10-05T20:00:00+00:00|393|0.564400000000",
+      "signal_time": "2026-10-05T20:00:00+00:00",
+      "entry_price": 0.5644,
+      "exit_price": 0.570044,
+      "initial_sl": 0.5644,
+      "margin": 10.0,
+      "notional": 100.0,
+      "leverage": 10.0,
+      "gross_pnl": 0.9999999999999969,
+      "fee": 1.0,
+      "pnl": -3.1086244689504383e-15,
+      "balance_before": 1219.5,
+      "balance_after": 1219.5,
+      "reason": "TRAILING SL",
+      "exit_time": "2026-10-06 00:55:39 UTC",
+      "candle_time": "2026-10-05T16:00:00+00:00",
+      "last_tp_hit": "TP3",
+      "tp_hits": [
+        {
+          "name": "TP1",
+          "percent": 1.0,
+          "price": 0.570044,
+          "time": "2026-10-06 00:55:37 UTC",
+          "new_sl": 0.5644
+        },
+        {
+          "name": "TP2",
+          "percent": 2.0,
+          "price": 0.575688,
+          "time": "2026-10-06 00:55:38 UTC",
+          "new_sl": 0.5644
+        },
+        {
+          "name": "TP3",
+          "percent": 3.0,
+          "price": 0.5813320000000001,
+          "time": "2026-10-06 00:55:38 UTC",
+          "new_sl": 0.570044
+        }
+      ],
+      "current_sl": 0.570044,
+      "initial_balance": 1220.5,
+      "balance_at_entry": 1220.5
+    },
+    {
+      "trade_number": 1070,
+      "symbol": "IMXUSDT",
+      "name": "IMX",
+      "side": "BUY",
+      "signal_id": "BUY|2026-10-05T20:00:00+00:00|393|0.181800000000",
+      "signal_time": "2026-10-05T20:00:00+00:00",
+      "entry_price": 0.1818,
+      "exit_price": 0.183618,
+      "initial_sl": 0.1818,
+      "margin": 10.0,
+      "notional": 100.0,
+      "leverage": 10.0,
+      "gross_pnl": 1.0000000000000078,
+      "fee": 1.0,
+      "pnl": 7.771561172376096e-15,
+      "balance_before": 1219.5,
+      "balance_after": 1219.5,
+      "reason": "TRAILING SL",
+      "exit_time": "2026-10-06 00:55:44 UTC",
+      "candle_time": "2026-10-05T16:00:00+00:00",
+      "last_tp_hit": "TP3",
+      "tp_hits": [
+        {
+          "name": "TP1",
+          "percent": 1.0,
+          "price": 0.183618,
+          "time": "2026-10-06 00:55:42 UTC",
+          "new_sl": 0.1818
+        },
+        {
+          "name": "TP2",
+          "percent": 2.0,
+          "price": 0.185436,
+          "time": "2026-10-06 00:55:43 UTC",
+          "new_sl": 0.1818
+        },
+        {
+          "name": "TP3",
+          "percent": 3.0,
+          "price": 0.187254,
+          "time": "2026-10-06 00:55:43 UTC",
+          "new_sl": 0.183618
+        }
+      ],
+      "current_sl": 0.183618,
+      "initial_balance": 1220.5,
+      "balance_at_entry": 1220.5
     }
   ],
   "deliveries": {
@@ -76280,6 +76467,114 @@
     },
     "SIGNAL|WIFUSDT|BUY|2026-10-05T20:00:00+00:00|393|0.251300000000": {
       "1448700069": true
+    },
+    "TP|FLOWUSDT|BUY|2026-10-05T20:00:00+00:00|393|0.031750000000|TP1": {
+      "1448700069": true
+    },
+    "TP|FLOWUSDT|BUY|2026-10-05T20:00:00+00:00|393|0.031750000000|TP2": {
+      "1448700069": true
+    },
+    "TP|MEMEUSDT|BUY|2026-10-05T20:00:00+00:00|393|0.000615000000|TP1": {
+      "1448700069": true
+    },
+    "TP|MEMEUSDT|BUY|2026-10-05T20:00:00+00:00|393|0.000615000000|TP2": {
+      "1448700069": true
+    },
+    "TP|HAEDALUSDT|SELL|2026-10-05T20:00:00+00:00|394|0.020490000000|TP1": {
+      "1448700069": true
+    },
+    "TP|HAEDALUSDT|SELL|2026-10-05T20:00:00+00:00|394|0.020490000000|TP2": {
+      "1448700069": true
+    },
+    "TP|HAEDALUSDT|SELL|2026-10-05T20:00:00+00:00|394|0.020490000000|TP3": {
+      "1448700069": true
+    },
+    "TP|ARBUSDT|BUY|2026-10-05T20:00:00+00:00|393|0.201500000000|TP1": {
+      "1448700069": true
+    },
+    "TP|ARBUSDT|BUY|2026-10-05T20:00:00+00:00|393|0.201500000000|TP2": {
+      "1448700069": true
+    },
+    "TP|ARBUSDT|BUY|2026-10-05T20:00:00+00:00|393|0.201500000000|TP3": {
+      "1448700069": true
+    },
+    "TP|ARBUSDT|BUY|2026-10-05T20:00:00+00:00|393|0.201500000000|TP4": {
+      "1448700069": true
+    },
+    "TP|ARUSDT|BUY|2026-10-05T20:00:00+00:00|393|4.440000000000|TP1": {
+      "1448700069": true
+    },
+    "TP|ARUSDT|BUY|2026-10-05T20:00:00+00:00|393|4.440000000000|TP2": {
+      "1448700069": true
+    },
+    "TP|ARUSDT|BUY|2026-10-05T20:00:00+00:00|393|4.440000000000|TP3": {
+      "1448700069": true
+    },
+    "TP|ARUSDT|BUY|2026-10-05T20:00:00+00:00|393|4.440000000000|TP4": {
+      "1448700069": true
+    },
+    "TP|ARUSDT|BUY|2026-10-05T20:00:00+00:00|393|4.440000000000|TP5": {
+      "1448700069": true
+    },
+    "TP|JTOUSDT|BUY|2026-10-05T20:00:00+00:00|393|0.564400000000|TP1": {
+      "1448700069": true
+    },
+    "TP|JTOUSDT|BUY|2026-10-05T20:00:00+00:00|393|0.564400000000|TP2": {
+      "1448700069": true
+    },
+    "TP|JTOUSDT|BUY|2026-10-05T20:00:00+00:00|393|0.564400000000|TP3": {
+      "1448700069": true
+    },
+    "STOP|JTOUSDT|BUY|2026-10-05T20:00:00+00:00|393|0.564400000000|2026-10-05T16:00:00+00:00|0.570044": {
+      "1448700069": true
+    },
+    "TP|FLOKIUSDT|BUY|2026-10-05T20:00:00+00:00|393|0.000028570000|TP1": {
+      "1448700069": true
+    },
+    "TP|FLOKIUSDT|BUY|2026-10-05T20:00:00+00:00|393|0.000028570000|TP2": {
+      "1448700069": true
+    },
+    "TP|FLOKIUSDT|BUY|2026-10-05T20:00:00+00:00|393|0.000028570000|TP3": {
+      "1448700069": true
+    },
+    "TP|PNUTUSDT|BUY|2026-10-05T20:00:00+00:00|393|0.054500000000|TP1": {
+      "1448700069": true
+    },
+    "TP|IOTAUSDT|BUY|2026-10-05T20:00:00+00:00|393|0.057900000000|TP1": {
+      "1448700069": true
+    },
+    "TP|IMXUSDT|BUY|2026-10-05T20:00:00+00:00|393|0.181800000000|TP1": {
+      "1448700069": true
+    },
+    "TP|IMXUSDT|BUY|2026-10-05T20:00:00+00:00|393|0.181800000000|TP2": {
+      "1448700069": true
+    },
+    "TP|IMXUSDT|BUY|2026-10-05T20:00:00+00:00|393|0.181800000000|TP3": {
+      "1448700069": true
+    },
+    "STOP|IMXUSDT|BUY|2026-10-05T20:00:00+00:00|393|0.181800000000|2026-10-05T16:00:00+00:00|0.183618": {
+      "1448700069": true
+    },
+    "TP|THETAUSDT|BUY|2026-10-05T20:00:00+00:00|393|0.228600000000|TP1": {
+      "1448700069": true
+    },
+    "TP|THETAUSDT|BUY|2026-10-05T20:00:00+00:00|393|0.228600000000|TP2": {
+      "1448700069": true
+    },
+    "TP|THETAUSDT|BUY|2026-10-05T20:00:00+00:00|393|0.228600000000|TP3": {
+      "1448700069": true
+    },
+    "TP|KSMUSDT|BUY|2026-10-05T20:00:00+00:00|393|5.170000000000|TP1": {
+      "1448700069": true
+    },
+    "TP|KSMUSDT|BUY|2026-10-05T20:00:00+00:00|393|5.170000000000|TP2": {
+      "1448700069": true
+    },
+    "TP|WIFUSDT|BUY|2026-10-05T20:00:00+00:00|393|0.251300000000|TP1": {
+      "1448700069": true
+    },
+    "TP|WIFUSDT|BUY|2026-10-05T20:00:00+00:00|393|0.251300000000|TP2": {
+      "1448700069": true
     }
   },
   "daily_stats": {
@@ -85221,6 +85516,21 @@
         "time": "2026-10-06 00:30:06 UTC",
         "balance": 1219.5,
         "reason": "trade #1059 TRAILING SL"
+      },
+      {
+        "time": "2026-10-06 00:55:14 UTC",
+        "balance": 1219.5,
+        "reason": "heartbeat"
+      },
+      {
+        "time": "2026-10-06 00:55:39 UTC",
+        "balance": 1219.5,
+        "reason": "trade #1066 TRAILING SL"
+      },
+      {
+        "time": "2026-10-06 00:55:44 UTC",
+        "balance": 1219.5,
+        "reason": "trade #1070 TRAILING SL"
       }
     ],
     "total_fees": 0.0
