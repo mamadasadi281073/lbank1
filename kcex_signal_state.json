@@ -95204,6 +95204,11 @@
         "time": "2026-10-08 12:57:13 UTC",
         "balance": 1373.5,
         "reason": "trade #1192 INITIAL SL"
+      },
+      {
+        "time": "2026-10-08 13:23:20 UTC",
+        "balance": 1373.5,
+        "reason": "heartbeat"
       }
     ],
     "total_fees": 0.0
