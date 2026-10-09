@@ -3127,8 +3127,8 @@
       "margin": 10.0,
       "notional": 100.0,
       "leverage": 10.0,
-      "tp1_hit": false,
-      "tp2_hit": false,
+      "tp1_hit": true,
+      "tp2_hit": true,
       "tp3_hit": false,
       "tp4_hit": false,
       "tp5_hit": false,
@@ -3136,8 +3136,23 @@
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "",
-      "tp_hits": [],
+      "last_tp_hit": "TP2",
+      "tp_hits": [
+        {
+          "name": "TP1",
+          "percent": 1.0,
+          "price": 0.482526,
+          "time": "2026-10-09 08:27:47 UTC",
+          "new_sl": 0.4874
+        },
+        {
+          "name": "TP2",
+          "percent": 2.0,
+          "price": 0.47765199999999997,
+          "time": "2026-10-09 08:27:48 UTC",
+          "new_sl": 0.4874
+        }
+      ],
       "balance_at_entry": 1426.5,
       "tp9_hit": false,
       "tp10_hit": false,
@@ -3186,8 +3201,8 @@
       "margin": 10.0,
       "notional": 100.0,
       "leverage": 10.0,
-      "tp1_hit": false,
-      "tp2_hit": false,
+      "tp1_hit": true,
+      "tp2_hit": true,
       "tp3_hit": false,
       "tp4_hit": false,
       "tp5_hit": false,
@@ -3195,8 +3210,23 @@
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "",
-      "tp_hits": [],
+      "last_tp_hit": "TP2",
+      "tp_hits": [
+        {
+          "name": "TP1",
+          "percent": 1.0,
+          "price": 0.0176121,
+          "time": "2026-10-09 08:27:50 UTC",
+          "new_sl": 0.01779
+        },
+        {
+          "name": "TP2",
+          "percent": 2.0,
+          "price": 0.0174342,
+          "time": "2026-10-09 08:27:50 UTC",
+          "new_sl": 0.01779
+        }
+      ],
       "balance_at_entry": 1428.5,
       "tp9_hit": false,
       "tp10_hit": false,
@@ -85576,6 +85606,18 @@
     },
     "SIGNAL|TSTUSDT|SELL|2026-10-09T04:00:00+00:00|393|0.017790000000": {
       "1448700069": true
+    },
+    "TP|ONDOUSDT|SELL|2026-10-09T04:00:00+00:00|393|0.487400000000|TP1": {
+      "1448700069": true
+    },
+    "TP|ONDOUSDT|SELL|2026-10-09T04:00:00+00:00|393|0.487400000000|TP2": {
+      "1448700069": true
+    },
+    "TP|TSTUSDT|SELL|2026-10-09T04:00:00+00:00|393|0.017790000000|TP1": {
+      "1448700069": true
+    },
+    "TP|TSTUSDT|SELL|2026-10-09T04:00:00+00:00|393|0.017790000000|TP2": {
+      "1448700069": true
     }
   },
   "daily_stats": {
@@ -96260,6 +96302,11 @@
         "time": "2026-10-09 08:02:58 UTC",
         "balance": 1428.5,
         "reason": "trade #1212 TRAILING SL"
+      },
+      {
+        "time": "2026-10-09 08:27:35 UTC",
+        "balance": 1428.5,
+        "reason": "heartbeat"
       }
     ],
     "total_fees": 0.0
