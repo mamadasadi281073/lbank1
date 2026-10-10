@@ -4036,8 +4036,8 @@
       "margin": 10.0,
       "notional": 100.0,
       "leverage": 10.0,
-      "tp1_hit": false,
-      "tp2_hit": false,
+      "tp1_hit": true,
+      "tp2_hit": true,
       "tp3_hit": false,
       "tp4_hit": false,
       "tp5_hit": false,
@@ -4045,8 +4045,23 @@
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "",
-      "tp_hits": [],
+      "last_tp_hit": "TP2",
+      "tp_hits": [
+        {
+          "name": "TP1",
+          "percent": 1.0,
+          "price": 0.360162,
+          "time": "2026-10-10 12:26:34 UTC",
+          "new_sl": 0.3638
+        },
+        {
+          "name": "TP2",
+          "percent": 2.0,
+          "price": 0.356524,
+          "time": "2026-10-10 12:26:34 UTC",
+          "new_sl": 0.3638
+        }
+      ],
       "balance_at_entry": 1441.5,
       "tp9_hit": false,
       "tp10_hit": false,
@@ -4088,24 +4103,60 @@
       "signal_id": "SELL|2026-10-10T08:00:00+00:00|394|0.014630000000",
       "side": "SELL",
       "initial_sl": 0.01463,
-      "current_sl": 0.01463,
-      "sl": 0.01463,
+      "current_sl": 0.0141911,
+      "sl": 0.0141911,
       "entry_price": 0.01463,
       "signal_time": "2026-10-10T08:00:00+00:00",
       "margin": 10.0,
       "notional": 100.0,
       "leverage": 10.0,
-      "tp1_hit": false,
-      "tp2_hit": false,
-      "tp3_hit": false,
-      "tp4_hit": false,
-      "tp5_hit": false,
+      "tp1_hit": true,
+      "tp2_hit": true,
+      "tp3_hit": true,
+      "tp4_hit": true,
+      "tp5_hit": true,
       "tp6_hit": false,
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "",
-      "tp_hits": [],
+      "last_tp_hit": "TP5",
+      "tp_hits": [
+        {
+          "name": "TP1",
+          "percent": 1.0,
+          "price": 0.0144837,
+          "time": "2026-10-10 12:26:35 UTC",
+          "new_sl": 0.01463
+        },
+        {
+          "name": "TP2",
+          "percent": 2.0,
+          "price": 0.0143374,
+          "time": "2026-10-10 12:26:35 UTC",
+          "new_sl": 0.01463
+        },
+        {
+          "name": "TP3",
+          "percent": 3.0,
+          "price": 0.0141911,
+          "time": "2026-10-10 12:26:36 UTC",
+          "new_sl": 0.0144837
+        },
+        {
+          "name": "TP4",
+          "percent": 4.0,
+          "price": 0.0140448,
+          "time": "2026-10-10 12:26:36 UTC",
+          "new_sl": 0.0143374
+        },
+        {
+          "name": "TP5",
+          "percent": 5.0,
+          "price": 0.0138985,
+          "time": "2026-10-10 12:26:37 UTC",
+          "new_sl": 0.0141911
+        }
+      ],
       "balance_at_entry": 1440.5,
       "tp9_hit": false,
       "tp10_hit": false,
@@ -91363,6 +91414,27 @@
     },
     "STOP|RENDERUSDT|SELL|2026-10-09T20:00:00+00:00|394|1.959000000000|2026-10-10T04:00:00+00:00|1.90023": {
       "1448700069": true
+    },
+    "TP|CRVUSDT|SELL|2026-10-10T08:00:00+00:00|393|0.363800000000|TP1": {
+      "1448700069": true
+    },
+    "TP|CRVUSDT|SELL|2026-10-10T08:00:00+00:00|393|0.363800000000|TP2": {
+      "1448700069": true
+    },
+    "TP|ZKUSDT|SELL|2026-10-10T08:00:00+00:00|394|0.014630000000|TP1": {
+      "1448700069": true
+    },
+    "TP|ZKUSDT|SELL|2026-10-10T08:00:00+00:00|394|0.014630000000|TP2": {
+      "1448700069": true
+    },
+    "TP|ZKUSDT|SELL|2026-10-10T08:00:00+00:00|394|0.014630000000|TP3": {
+      "1448700069": true
+    },
+    "TP|ZKUSDT|SELL|2026-10-10T08:00:00+00:00|394|0.014630000000|TP4": {
+      "1448700069": true
+    },
+    "TP|ZKUSDT|SELL|2026-10-10T08:00:00+00:00|394|0.014630000000|TP5": {
+      "1448700069": true
     }
   },
   "daily_stats": {
@@ -102763,6 +102835,11 @@
         "time": "2026-10-10 12:01:41 UTC",
         "balance": 1441.5,
         "reason": "trade #1290 TRAILING SL"
+      },
+      {
+        "time": "2026-10-10 12:26:20 UTC",
+        "balance": 1441.5,
+        "reason": "heartbeat"
       }
     ],
     "total_fees": 0.0
