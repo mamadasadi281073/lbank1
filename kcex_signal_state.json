@@ -5459,7 +5459,7 @@
       "margin": 10.0,
       "notional": 100.0,
       "leverage": 10.0,
-      "tp1_hit": false,
+      "tp1_hit": true,
       "tp2_hit": false,
       "tp3_hit": false,
       "tp4_hit": false,
@@ -5468,8 +5468,16 @@
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "",
-      "tp_hits": [],
+      "last_tp_hit": "TP1",
+      "tp_hits": [
+        {
+          "name": "TP1",
+          "percent": 1.0,
+          "price": 0.03465,
+          "time": "2026-10-10 04:26:26 UTC",
+          "new_sl": 0.035
+        }
+      ],
       "balance_at_entry": 1443.5,
       "tp9_hit": false,
       "tp10_hit": false,
@@ -5518,7 +5526,7 @@
       "margin": 10.0,
       "notional": 100.0,
       "leverage": 10.0,
-      "tp1_hit": false,
+      "tp1_hit": true,
       "tp2_hit": false,
       "tp3_hit": false,
       "tp4_hit": false,
@@ -5527,8 +5535,16 @@
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "",
-      "tp_hits": [],
+      "last_tp_hit": "TP1",
+      "tp_hits": [
+        {
+          "name": "TP1",
+          "percent": 1.0,
+          "price": 1.06623,
+          "time": "2026-10-10 04:26:27 UTC",
+          "new_sl": 1.077
+        }
+      ],
       "balance_at_entry": 1439.5,
       "tp9_hit": false,
       "tp10_hit": false,
@@ -5570,24 +5586,53 @@
       "signal_id": "SELL|2026-10-10T00:00:00+00:00|393|0.846800000000",
       "side": "SELL",
       "initial_sl": 0.8468,
-      "current_sl": 0.8468,
-      "sl": 0.8468,
+      "current_sl": 0.8298639999999999,
+      "sl": 0.8298639999999999,
       "entry_price": 0.8468,
       "signal_time": "2026-10-10T00:00:00+00:00",
       "margin": 10.0,
       "notional": 100.0,
       "leverage": 10.0,
-      "tp1_hit": false,
-      "tp2_hit": false,
-      "tp3_hit": false,
-      "tp4_hit": false,
+      "tp1_hit": true,
+      "tp2_hit": true,
+      "tp3_hit": true,
+      "tp4_hit": true,
       "tp5_hit": false,
       "tp6_hit": false,
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "",
-      "tp_hits": [],
+      "last_tp_hit": "TP4",
+      "tp_hits": [
+        {
+          "name": "TP1",
+          "percent": 1.0,
+          "price": 0.838332,
+          "time": "2026-10-10 04:26:28 UTC",
+          "new_sl": 0.8468
+        },
+        {
+          "name": "TP2",
+          "percent": 2.0,
+          "price": 0.8298639999999999,
+          "time": "2026-10-10 04:26:29 UTC",
+          "new_sl": 0.8468
+        },
+        {
+          "name": "TP3",
+          "percent": 3.0,
+          "price": 0.821396,
+          "time": "2026-10-10 04:26:30 UTC",
+          "new_sl": 0.838332
+        },
+        {
+          "name": "TP4",
+          "percent": 4.0,
+          "price": 0.812928,
+          "time": "2026-10-10 04:26:30 UTC",
+          "new_sl": 0.8298639999999999
+        }
+      ],
       "balance_at_entry": 1440.5,
       "tp9_hit": false,
       "tp10_hit": false,
@@ -91499,6 +91544,24 @@
     },
     "STOP|WIFUSDT|SELL|2026-10-09T20:00:00+00:00|394|0.216400000000|2026-10-09T20:00:00+00:00|0.214236": {
       "1448700069": true
+    },
+    "TP|WALUSDT|SELL|2026-10-10T00:00:00+00:00|393|0.035000000000|TP1": {
+      "1448700069": true
+    },
+    "TP|SUIUSDT|SELL|2026-10-10T00:00:00+00:00|393|1.077000000000|TP1": {
+      "1448700069": true
+    },
+    "TP|APTUSDT|SELL|2026-10-10T00:00:00+00:00|393|0.846800000000|TP1": {
+      "1448700069": true
+    },
+    "TP|APTUSDT|SELL|2026-10-10T00:00:00+00:00|393|0.846800000000|TP2": {
+      "1448700069": true
+    },
+    "TP|APTUSDT|SELL|2026-10-10T00:00:00+00:00|393|0.846800000000|TP3": {
+      "1448700069": true
+    },
+    "TP|APTUSDT|SELL|2026-10-10T00:00:00+00:00|393|0.846800000000|TP4": {
+      "1448700069": true
     }
   },
   "daily_stats": {
@@ -102708,6 +102771,11 @@
         "time": "2026-10-10 04:05:35 UTC",
         "balance": 1441.5,
         "reason": "trade #1295 TRAILING SL"
+      },
+      {
+        "time": "2026-10-10 04:26:15 UTC",
+        "balance": 1441.5,
+        "reason": "heartbeat"
       }
     ],
     "total_fees": 0.0
