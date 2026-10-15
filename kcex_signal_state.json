@@ -7257,24 +7257,46 @@
       "signal_id": "BUY|2026-10-15T16:00:00+00:00|394|80226.350000000006",
       "side": "BUY",
       "initial_sl": 80226.35,
-      "current_sl": 80226.35,
-      "sl": 80226.35,
+      "current_sl": 81028.6135,
+      "sl": 81028.6135,
       "entry_price": 80226.35,
       "signal_time": "2026-10-15T16:00:00+00:00",
       "margin": 10.0,
       "notional": 100.0,
       "leverage": 10.0,
-      "tp1_hit": false,
-      "tp2_hit": false,
-      "tp3_hit": false,
+      "tp1_hit": true,
+      "tp2_hit": true,
+      "tp3_hit": true,
       "tp4_hit": false,
       "tp5_hit": false,
       "tp6_hit": false,
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "",
-      "tp_hits": [],
+      "last_tp_hit": "TP3",
+      "tp_hits": [
+        {
+          "name": "TP1",
+          "percent": 1.0,
+          "price": 81028.6135,
+          "time": "2026-10-15 23:58:28 UTC",
+          "new_sl": 80226.35
+        },
+        {
+          "name": "TP2",
+          "percent": 2.0,
+          "price": 81830.87700000001,
+          "time": "2026-10-15 23:58:29 UTC",
+          "new_sl": 80226.35
+        },
+        {
+          "name": "TP3",
+          "percent": 3.0,
+          "price": 82633.14050000001,
+          "time": "2026-10-15 23:58:30 UTC",
+          "new_sl": 81028.6135
+        }
+      ],
       "balance_at_entry": 1631.5,
       "tp9_hit": false,
       "tp10_hit": false,
@@ -113266,6 +113288,15 @@
     },
     "STOP|CHZUSDT|SELL|2026-10-14T00:00:00+00:00|393|0.015000000000|2026-10-15T12:00:00+00:00|0.01425": {
       "1448700069": true
+    },
+    "TP|BTCUSDT|BUY|2026-10-15T16:00:00+00:00|394|80226.350000000006|TP1": {
+      "1448700069": true
+    },
+    "TP|BTCUSDT|BUY|2026-10-15T16:00:00+00:00|394|80226.350000000006|TP2": {
+      "1448700069": true
+    },
+    "TP|BTCUSDT|BUY|2026-10-15T16:00:00+00:00|394|80226.350000000006|TP3": {
+      "1448700069": true
     }
   },
   "daily_stats": {
@@ -127226,6 +127257,11 @@
         "time": "2026-10-15 21:50:37 UTC",
         "balance": 1639.5,
         "reason": "trade #1551 TRAILING SL"
+      },
+      {
+        "time": "2026-10-15 23:58:18 UTC",
+        "balance": 1639.5,
+        "reason": "heartbeat"
       }
     ],
     "total_fees": 0.0
