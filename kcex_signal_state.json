@@ -9660,8 +9660,8 @@
       "margin": 10.0,
       "notional": 100.0,
       "leverage": 10.0,
-      "tp1_hit": false,
-      "tp2_hit": false,
+      "tp1_hit": true,
+      "tp2_hit": true,
       "tp3_hit": false,
       "tp4_hit": false,
       "tp5_hit": false,
@@ -9669,8 +9669,23 @@
       "tp7_hit": false,
       "tp8_hit": false,
       "full_tp_hit": false,
-      "last_tp_hit": "",
-      "tp_hits": [],
+      "last_tp_hit": "TP2",
+      "tp_hits": [
+        {
+          "name": "TP1",
+          "percent": 1.0,
+          "price": 0.03191600000000001,
+          "time": "2026-10-24 19:41:39 UTC",
+          "new_sl": 0.0316
+        },
+        {
+          "name": "TP2",
+          "percent": 2.0,
+          "price": 0.032232000000000004,
+          "time": "2026-10-24 19:41:40 UTC",
+          "new_sl": 0.0316
+        }
+      ],
       "balance_at_entry": 2043.5,
       "tp9_hit": false,
       "tp10_hit": false,
@@ -140015,6 +140030,12 @@
     },
     "TP|PYTHUSDT|SELL|2026-10-23T20:00:00+00:00|393|0.073480000000|TP6": {
       "1448700069": true
+    },
+    "TP|IDUSDT|BUY|2026-10-24T12:00:00+00:00|393|0.031600000000|TP1": {
+      "1448700069": true
+    },
+    "TP|IDUSDT|BUY|2026-10-24T12:00:00+00:00|393|0.031600000000|TP2": {
+      "1448700069": true
     }
   },
   "daily_stats": {
@@ -157190,6 +157211,11 @@
         "time": "2026-10-24 17:26:32 UTC",
         "balance": 2058.5,
         "reason": "trade #1931 TRAILING SL"
+      },
+      {
+        "time": "2026-10-24 19:41:25 UTC",
+        "balance": 2058.5,
+        "reason": "heartbeat"
       }
     ],
     "total_fees": 0.0
