@@ -2,16 +2,22 @@ name: Crypto TradeIQ Scanner
 
 on:
   workflow_dispatch:
-
   schedule:
-    - cron: "*/5 * * * *"
+    # Binance 4H candles close at 00:00, 04:00, 08:00, 12:00, 16:00, 20:00 UTC.
+    # Run a few minutes later so the just-closed candle is available.
+    - cron: "7 */4 * * *"
 
 permissions:
   contents: write
 
+concurrency:
+  group: crypto-tradeiq-scanner
+  cancel-in-progress: false
+
 jobs:
   crypto-scan:
     runs-on: ubuntu-latest
+    timeout-minutes: 40
 
     steps:
       - name: Checkout repository
@@ -21,6 +27,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-crypto.txt
 
       - name: Install Python packages
         run: |
@@ -35,6 +43,9 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
+          MAX_LOSS_PER_TRADE_USD: "10"
+          CLOSE_FEE_USD: "1"
         run: |
           python crypto_tradeiq.py
 
@@ -42,9 +53,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
           git add kcex_signal_state.json telegram_command_state.json
-
           if git diff --cached --quiet; then
             echo "No state changes to commit."
           else
