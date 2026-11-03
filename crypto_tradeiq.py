@@ -57,6 +57,7 @@ TP8_PERCENT = 20.0
 
 STARTING_BALANCE = 200.0
 CLOSE_FEE_USD = float(os.getenv("CLOSE_FEE_USD", "1.0"))
+MAX_LOSS_PER_TRADE_USD = float(os.getenv("MAX_LOSS_PER_TRADE_USD", "10.0"))
 FIXED_MARGIN = 10.0
 LEVERAGE = 10.0
 # Maximum number of simultaneous open simulated positions.
@@ -307,6 +308,24 @@ def load_state():
             active.setdefault(f"tp{n}_hit", False)
         active.setdefault("tp_hits", [])
         active.setdefault("balance_at_entry", float(portfolio.get("balance", STARTING_BALANCE)))
+
+        # Migrate old trades: the previous version incorrectly set initial SL
+        # equal to entry (zero stop distance). Repair only trades that have not
+        # reached any TP; once a TP is hit, preserve the trailing SL.
+        has_any_tp = bool(
+            active.get("last_tp_hit")
+            or active.get("tp_hits")
+            or any(active.get(f"tp{n}_hit", False) for n in range(1, 41))
+        )
+        if not has_any_tp and active.get("entry_price") is not None:
+            repaired_sl = calculate_initial_sl(
+                float(active["entry_price"]),
+                active["side"],
+                float(active["notional"]),
+            )
+            active["initial_sl"] = repaired_sl
+            active["current_sl"] = repaired_sl
+            active["sl"] = repaired_sl
 
     try:
         saved_next = int(portfolio.get("next_trade_number", 1))
@@ -1581,6 +1600,36 @@ def tp_hit_key(tp_name):
     return tp_name.lower().replace(" ", "_") + "_hit"
 
 
+def calculate_initial_sl(entry_price, side, notional, max_loss_usd=None):
+    """
+    Convert a maximum USD loss into a stop price.
+
+    PnL is calculated against position notional (margin * leverage), so:
+        adverse_move_fraction = max_loss_usd / notional
+
+    The fixed $1 closing fee is deducted separately in close_trade.
+    """
+    entry_price = float(entry_price)
+    notional = float(notional)
+    max_loss = MAX_LOSS_PER_TRADE_USD if max_loss_usd is None else float(max_loss_usd)
+
+    if entry_price <= 0 or notional <= 0:
+        raise ValueError("entry_price and notional must be positive")
+    if max_loss <= 0:
+        raise ValueError("MAX_LOSS_PER_TRADE_USD must be positive")
+    if max_loss >= notional:
+        raise ValueError(
+            f"Maximum loss (${max_loss:.2f}) must be smaller than position notional (${notional:.2f})"
+        )
+
+    distance = max_loss / notional
+    if side == "BUY":
+        return entry_price * (1.0 - distance)
+    if side == "SELL":
+        return entry_price * (1.0 + distance)
+    raise ValueError(f"Invalid trade side: {side}")
+
+
 def trade_pnl(entry, exit_price, side, notional):
     if entry <= 0 or notional <= 0:
         return 0.0
@@ -1788,13 +1837,16 @@ def active_trade_details_text(active, info):
 # SIGNAL MESSAGE
 # =========================================================
 
-def signal_text(info, signal, trade_number=None, margin=None, notional=None):
+def signal_text(info, signal, trade_number=None, margin=None, notional=None, initial_sl=None):
     side = canonical_side_from_event(signal.get("event_direction")) or signal.get("side")
     if side not in ("BUY", "SELL"):
         raise ValueError(f"Invalid signal side: {side}")
     if signal.get("side") != side:
         raise ValueError(f"Signal side mismatch: event={signal.get('event_direction')} side={signal.get('side')}")
     entry = float(signal["zone_low"] if side == "BUY" else signal["zone_high"])
+    if initial_sl is None:
+        effective_notional = float(notional or (FIXED_MARGIN * LEVERAGE))
+        initial_sl = calculate_initial_sl(entry, side, effective_notional)
     lines = [
         "🟢 سیگنال خرید" if side == "BUY" else "🔴 سیگنال فروش",
         "",
@@ -1804,7 +1856,9 @@ def signal_text(info, signal, trade_number=None, margin=None, notional=None):
         "تایم‌فریم: 4H",
         "",
         f"📍 ورود: {entry:.12g}",
-        f"🛑 SL اولیه: {float(signal['sl']):.12g}",
+        f"🛑 SL اولیه: {float(initial_sl):.12g}",
+        f"⚠️ حداکثر ضرر ناخالص: ${MAX_LOSS_PER_TRADE_USD:.2f}",
+        "🕯️ بررسی SL فقط پس از بسته‌شدن کندل ۴ ساعته",
     ]
     if margin is not None and notional is not None:
         lines += [f"💵 مارجین: ${margin:.2f}", f"📊 ارزش پوزیشن: ${notional:.2f}", f"⚡ اهرم: {LEVERAGE:g}x"]
@@ -1946,12 +2000,10 @@ def check_stop(state, info, df):
     if not active or df is None or len(df) < 2:
         return
     try:
-        # FIX: detect SL on wick (High/Low) of the current candle, same as TP logic.
-        # Previous code only checked Close of the last fully closed candle and often
-        # missed real SL hits (or hit them one bar late), and with notional=0 the
-        # resulting loss was never applied to balance.
-        high = float(df["High"].iloc[-1])
-        low = float(df["Low"].iloc[-1])
+        # _binance_kline() removes the still-forming candle, so the final row
+        # here is the most recently CLOSED 4H candle. SL is confirmed by Close,
+        # not by an intrabar wick.
+        candle_close = float(df["Close"].iloc[-1])
         sl = float(active.get("current_sl", active.get("sl")))
         float(active["entry_price"])
         side = active["side"]
@@ -1959,9 +2011,9 @@ def check_stop(state, info, df):
         print(f"{info['symbol']}: active trade has incomplete pricing data; skipping SL check.")
         return
     if side == "BUY":
-        hit = low <= sl
+        hit = candle_close <= sl
     else:
-        hit = high >= sl
+        hit = candle_close >= sl
     if not hit:
         return
     candle_time = df.index[-1].isoformat()
@@ -2447,12 +2499,17 @@ def analyze_symbol(state, info, df):
 
     try:
         trade_number, margin, notional = allocate_trade(state)
-    except RuntimeError as error:
+        initial_sl = calculate_initial_sl(
+            entry_price,
+            signal["side"],
+            notional,
+        )
+    except (RuntimeError, ValueError) as error:
         print(f"{info['symbol']}: signal skipped: {error}")
         save_state(state)
         return
 
-    text = signal_text(info, signal, trade_number, margin, notional)
+    text = signal_text(info, signal, trade_number, margin, notional, initial_sl)
     # TP1 is the button that reveals TP3 through TP40. TP2 remains visible in the main message.
     reply_markup = {
         "inline_keyboard": [
@@ -2474,9 +2531,9 @@ def analyze_symbol(state, info, df):
         "name": info.get("name", info["symbol"]),
         "signal_id": signal["id"],
         "side": signal["side"],
-        "initial_sl": float(signal["sl"]),
-        "current_sl": float(signal["sl"]),
-        "sl": float(signal["sl"]),
+        "initial_sl": float(initial_sl),
+        "current_sl": float(initial_sl),
+        "sl": float(initial_sl),
         "entry_price": entry_price,
         "signal_time": signal["event_time"],
         "margin": margin,
