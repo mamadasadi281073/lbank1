@@ -287,8 +287,15 @@ def load_state():
                         pass
         active.setdefault("initial_sl", active.get("sl"))
         active.setdefault("current_sl", active.get("sl"))
-        active.setdefault("margin", 0.0)
-        active.setdefault("notional", 0.0)
+        # FIX: never leave margin/notional at 0 — otherwise PnL is always zero on SL
+        if not active.get("margin") or float(active.get("margin") or 0) <= 0:
+            active["margin"] = FIXED_MARGIN
+        else:
+            active["margin"] = float(active["margin"])
+        if not active.get("notional") or float(active.get("notional") or 0) <= 0:
+            active["notional"] = FIXED_MARGIN * LEVERAGE
+        else:
+            active["notional"] = float(active["notional"])
         active.setdefault("tp4_hit", False)
         active.setdefault("tp5_hit", False)
         active.setdefault("tp6_hit", False)
@@ -1645,7 +1652,13 @@ def allocate_trade(state):
 def close_trade(state, info, active, exit_price, reason, candle_time=None):
     """Close position and persist PnL/balance before any Telegram delivery."""
     entry = float(active["entry_price"])
-    notional = float(active.get("notional", 0.0))
+    # FIX: if notional is missing/zero (old state), fall back to configured size
+    # otherwise gross_pnl stays 0 and the real SL loss is never deducted from balance
+    notional = float(active.get("notional", 0.0) or 0.0)
+    if notional <= 0:
+        notional = FIXED_MARGIN * LEVERAGE
+        active["notional"] = notional
+        active["margin"] = float(active.get("margin") or FIXED_MARGIN) or FIXED_MARGIN
     gross_pnl = trade_pnl(entry, float(exit_price), active["side"], notional)
     fee = max(0.0, CLOSE_FEE_USD)
     pnl = gross_pnl - fee
@@ -1916,22 +1929,32 @@ def check_take_profits(state, info, df):
 
 def check_stop(state, info, df):
     active = state["active"].get(info["symbol"])
-    if not active or len(df) < 2:
+    if not active or df is None or len(df) < 2:
         return
     try:
-        close = float(df["Close"].iloc[-2])
+        # FIX: detect SL on wick (High/Low) of the current candle, same as TP logic.
+        # Previous code only checked Close of the last fully closed candle and often
+        # missed real SL hits (or hit them one bar late), and with notional=0 the
+        # resulting loss was never applied to balance.
+        high = float(df["High"].iloc[-1])
+        low = float(df["Low"].iloc[-1])
         sl = float(active.get("current_sl", active.get("sl")))
         float(active["entry_price"])
+        side = active["side"]
     except (KeyError, TypeError, ValueError):
         print(f"{info['symbol']}: active trade has incomplete pricing data; skipping SL check.")
         return
-    hit = close < sl if active["side"] == "BUY" else close > sl
+    if side == "BUY":
+        hit = low <= sl
+    else:
+        hit = high >= sl
     if not hit:
         return
-    candle_time = df.index[-2].isoformat()
+    candle_time = df.index[-1].isoformat()
     delivery_key = f"STOP|{info['symbol']}|{active['signal_id']}|{candle_time}|{sl:.12g}"
     reason = "TRAILING SL" if active.get("last_tp_hit") else "INITIAL SL"
     # Close and persist first; Telegram can never block accounting.
+    # Exit price is the SL level so PnL reflects the real stop distance.
     closed = close_trade(state, info, active, sl, reason, candle_time)
     text = trade_details_text(closed, f"🛑 معامله بسته شد روی {reason}")
     if not deliver_once(state, delivery_key, text):
