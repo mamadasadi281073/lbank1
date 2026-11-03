@@ -59,6 +59,8 @@ STARTING_BALANCE = 200.0
 CLOSE_FEE_USD = float(os.getenv("CLOSE_FEE_USD", "1.0"))
 FIXED_MARGIN = 10.0
 LEVERAGE = 10.0
+# Maximum number of simultaneous open simulated positions.
+MAX_OPEN_TRADES = int(os.getenv("MAX_OPEN_TRADES", "9"))
 
 # Maximum allowed distance between the signal event close and the
 # selected Order Block boundary. Kept identical to the original filter.
@@ -1618,12 +1620,24 @@ def record_equity_point(state, reason=""):
 
 
 def allocate_trade(state):
+    """Reserve a trade number and size. Raises RuntimeError if limits block entry."""
     portfolio = state["portfolio"]
     balance = float(portfolio["balance"])
     margin = FIXED_MARGIN
     notional = margin * LEVERAGE
 
-    # Never exceed the configured maximum number of simulated open positions.
+    open_count = len(state.get("active", {}) or {})
+    if open_count >= MAX_OPEN_TRADES:
+        raise RuntimeError(
+            f"max open trades reached ({open_count}/{MAX_OPEN_TRADES})"
+        )
+
+    # Do not open a new position when free balance cannot cover fixed margin.
+    if balance < margin:
+        raise RuntimeError(
+            f"insufficient balance ${balance:.2f} < margin ${margin:.2f}"
+        )
+
     # Always recover a valid unique number, even if an old state file was
     # manually edited or contains a missing/invalid next_trade_number.
     used = []
