@@ -2048,40 +2048,97 @@ def portfolio_metrics(state):
 # DAILY REPORT
 # =========================================================
 
+def summarize_closed_trades(trades):
+    """Return consistent gross/fee/net statistics for a reporting period."""
+    gross = sum(
+        float(t.get("gross_pnl", float(t.get("pnl", 0.0) or 0.0) + float(t.get("fee", 0.0) or 0.0)) or 0.0)
+        for t in trades
+    )
+    fees = sum(float(t.get("fee", 0.0) or 0.0) for t in trades)
+    net = sum(float(t.get("pnl", 0.0) or 0.0) for t in trades)
+    wins = sum(1 for t in trades if float(t.get("pnl", 0.0) or 0.0) > 1e-12)
+    losses = sum(1 for t in trades if float(t.get("pnl", 0.0) or 0.0) < -1e-12)
+    breakeven = len(trades) - wins - losses
+    tp_closes = sum(1 for t in trades if "TP" in str(t.get("reason", "")).upper())
+    sl_closes = sum(1 for t in trades if "SL" in str(t.get("reason", "")).upper())
+    best = max((float(t.get("pnl", 0.0) or 0.0) for t in trades), default=0.0)
+    worst = min((float(t.get("pnl", 0.0) or 0.0) for t in trades), default=0.0)
+    win_rate = (wins / len(trades) * 100.0) if trades else 0.0
+    return {
+        "gross": gross, "fees": fees, "net": net,
+        "wins": wins, "losses": losses, "breakeven": breakeven,
+        "tp_closes": tp_closes, "sl_closes": sl_closes,
+        "best": best, "worst": worst, "win_rate": win_rate,
+    }
+
+
+def count_tp_milestones(state, prefix=None, start=None, end=None):
+    """Count TP level hits in a period, including still-open positions."""
+    total = 0
+    trades = list(state.get("closed_trades", [])) + list(state.get("active", {}).values())
+    for trade in trades:
+        for hit in trade.get("tp_hits", []) or []:
+            stamp = str(hit.get("time", ""))
+            if prefix is not None and stamp.startswith(prefix):
+                total += 1
+                continue
+            if start is not None and end is not None:
+                try:
+                    dt = datetime.fromisoformat(stamp.replace(" UTC", "+00:00"))
+                    if dt.tzinfo is None:
+                        dt = dt.replace(tzinfo=timezone.utc)
+                    if start <= dt < end:
+                        total += 1
+                except Exception:
+                    pass
+    return total
+
+
 def daily_report_text(state, report_date):
     stats = get_daily_stats(state, report_date)
-    opening = float(state["portfolio"].get("period_opening_balances", {}).get(f"DAY|{report_date}", state["portfolio"]["initial_balance"]))
-    closing = float(state["portfolio"]["balance"])
-    pnl = closing - opening
-    closed = [t for t in state.get("closed_trades", []) if str(t.get("exit_time", "")).startswith(report_date)]
-    wins = sum(1 for t in closed if float(t.get("pnl", 0)) > 0)
-    losses = sum(1 for t in closed if float(t.get("pnl", 0)) < 0)
-    best = max((float(t.get("pnl", 0)) for t in closed), default=0.0)
-    worst = min((float(t.get("pnl", 0)) for t in closed), default=0.0)
+    portfolio = state["portfolio"]
+    opening = float(portfolio.get("period_opening_balances", {}).get(
+        f"DAY|{report_date}", portfolio.get("initial_balance", STARTING_BALANCE)
+    ))
+    closing_now = float(portfolio.get("balance", STARTING_BALANCE))
+    closed = [
+        t for t in state.get("closed_trades", [])
+        if str(t.get("exit_time", "")).startswith(report_date)
+    ]
+    m = summarize_closed_trades(closed)
+    period_end_balance = opening + m["net"]
     peak, drawdown = portfolio_metrics(state)
-    return (f"📊 گزارش روزانه\n\n📅 تاریخ: {report_date}\n\n"
-            f"💰 موجودی ابتدای روز: ${opening:.2f}\n"
-            f"💰 موجودی فعلی: ${closing:.2f}\n"
-            f"📈 سود/ضرر روز: {'+' if pnl >= 0 else ''}${pnl:.2f}\n"
-            f"📊 بازده روز: {(pnl/opening*100 if opening else 0):.2f}%\n\n"
-            f"📨 سیگنال‌های امروز: {int(stats.get('signals',0))}\n"
-            f"✅ معاملات بسته‌شده سودده: {wins}\n"
-            f"❌ معاملات بسته‌شده زیان‌ده: {losses}\n"
-            f"🏆 بهترین معامله: ${best:+.2f}\n"
-            f"💥 بدترین معامله: ${worst:+.2f}\n"
-            f"📈 بیشترین موجودی ثبت‌شده: ${peak:.2f}\n"
-            f"📉 Max Drawdown: {drawdown:.2f}%\n"
-            f"📂 معاملات باز: {len(state.get('active',{}))}\n\n{TELEGRAM_SIGNATURE}")
+    return (
+        f"📊 گزارش روزانه\n\n📅 تاریخ: {report_date}\n\n"
+        f"💰 موجودی ابتدای روز: ${opening:.2f}\n"
+        f"💰 موجودی پایان دوره بر اساس معاملات بسته‌شده: ${period_end_balance:.2f}\n"
+        f"💰 موجودی فعلی حساب: ${closing_now:.2f}\n"
+        f"📈 سود ناخالص: ${m['gross']:+.2f}\n"
+        f"💸 کارمزد پرداخت‌شده: ${m['fees']:.2f}\n"
+        f"💵 سود/ضرر خالص: ${m['net']:+.2f}\n"
+        f"📊 بازده خالص روز: {(m['net']/opening*100 if opening else 0):.2f}%\n\n"
+        f"📨 سیگنال‌های امروز: {int(stats.get('signals', 0))}\n"
+        f"📊 معاملات بسته‌شده: {len(closed)}\n"
+        f"🎯 برخوردهای TP (شامل معاملات باز): {count_tp_milestones(state, prefix=report_date)}\n"
+        f"🎯 بسته‌شده با TP: {m['tp_closes']} | 🛑 بسته‌شده با SL: {m['sl_closes']}\n"
+        f"✅ سودده: {m['wins']} | ❌ زیان‌ده: {m['losses']} | ➖ سربه‌سر: {m['breakeven']}\n"
+        f"🎯 درصد برد معاملات بسته‌شده: {m['win_rate']:.1f}%\n"
+        f"🏆 بهترین معامله خالص: ${m['best']:+.2f}\n"
+        f"💥 بدترین معامله خالص: ${m['worst']:+.2f}\n"
+        f"📈 بیشترین موجودی ثبت‌شده: ${peak:.2f}\n"
+        f"📉 Max Drawdown: {drawdown:.2f}%\n"
+        f"📂 معاملات باز فعلی: {len(state.get('active', {}))}\n\n{TELEGRAM_SIGNATURE}"
+    )
 
 
 def should_send_daily_report():
 
     now = utc_datetime()
 
-    if now.hour != DAILY_REPORT_HOUR_UTC:
+    if now.hour < DAILY_REPORT_HOUR_UTC:
         return False
 
-    if now.minute < DAILY_REPORT_MINUTE_UTC:
+    if now.hour == DAILY_REPORT_HOUR_UTC and now.minute < DAILY_REPORT_MINUTE_UTC:
         return False
 
     return True
@@ -2135,24 +2192,37 @@ def send_daily_report(
 # =========================================================
 
 def monthly_report_text(state, month_string):
-    opening = float(state["portfolio"].get("period_opening_balances", {}).get(f"MONTH|{month_string}", state["portfolio"]["initial_balance"]))
-    trades = [t for t in state.get("closed_trades", []) if str(t.get("exit_time", "")).startswith(month_string)]
-    pnl = sum(float(t.get("pnl",0)) for t in trades)
-    closing = opening + pnl
-    wins = sum(1 for t in trades if float(t.get("pnl",0)) > 0)
-    losses = sum(1 for t in trades if float(t.get("pnl",0)) < 0)
-    best = max((float(t.get("pnl", 0)) for t in trades), default=0.0)
-    worst = min((float(t.get("pnl", 0)) for t in trades), default=0.0)
+    portfolio = state["portfolio"]
+    opening = float(portfolio.get("period_opening_balances", {}).get(
+        f"MONTH|{month_string}", portfolio.get("initial_balance", STARTING_BALANCE)
+    ))
+    current_balance = float(portfolio.get("balance", STARTING_BALANCE))
+    trades = [
+        t for t in state.get("closed_trades", [])
+        if str(t.get("exit_time", "")).startswith(month_string)
+    ]
+    m = summarize_closed_trades(trades)
+    period_end_balance = opening + m["net"]
     peak, drawdown = portfolio_metrics(state)
-    return (f"📊 گزارش ماهانه\n\n📅 ماه: {month_string}\n\n"
-            f"💰 موجودی ابتدای ماه: ${opening:.2f}\n"
-            f"💰 موجودی پایان ماه: ${closing:.2f}\n"
-            f"📈 سود/ضرر ماه: {'+' if pnl >= 0 else ''}${pnl:.2f}\n"
-            f"📊 بازده ماه: {(pnl/opening*100 if opening else 0):.2f}%\n\n"
-            f"📊 معاملات بسته‌شده: {len(trades)}\n"
-            f"✅ سودده: {wins}\n❌ زیان‌ده: {losses}\n"
-            f"🏆 بهترین معامله: ${best:+.2f}\n💥 بدترین معامله: ${worst:+.2f}\n"
-            f"📈 بیشترین موجودی: ${peak:.2f}\n📉 Max Drawdown: {drawdown:.2f}%\n\n{TELEGRAM_SIGNATURE}")
+    return (
+        f"📊 گزارش ماهانه\n\n📅 ماه: {month_string}\n\n"
+        f"💰 موجودی ابتدای ماه: ${opening:.2f}\n"
+        f"💰 موجودی پایان ماه بر اساس معاملات همان ماه: ${period_end_balance:.2f}\n"
+        f"💰 موجودی فعلی حساب: ${current_balance:.2f}\n"
+        f"📈 سود ناخالص: ${m['gross']:+.2f}\n"
+        f"💸 مجموع کارمزد: ${m['fees']:.2f}\n"
+        f"💵 سود/ضرر خالص ماه: ${m['net']:+.2f}\n"
+        f"📊 بازده خالص ماه: {(m['net']/opening*100 if opening else 0):.2f}%\n\n"
+        f"📊 معاملات بسته‌شده: {len(trades)}\n"
+        f"🎯 برخوردهای TP (شامل معاملات باز): {count_tp_milestones(state, prefix=month_string)}\n"
+        f"🎯 بسته‌شده با TP: {m['tp_closes']} | 🛑 بسته‌شده با SL: {m['sl_closes']}\n"
+        f"✅ سودده: {m['wins']} | ❌ زیان‌ده: {m['losses']} | ➖ سربه‌سر: {m['breakeven']}\n"
+        f"🎯 درصد برد: {m['win_rate']:.1f}%\n"
+        f"🏆 بهترین معامله خالص: ${m['best']:+.2f}\n"
+        f"💥 بدترین معامله خالص: ${m['worst']:+.2f}\n"
+        f"📈 بیشترین موجودی ثبت‌شده: ${peak:.2f}\n"
+        f"📉 Max Drawdown: {drawdown:.2f}%\n\n{TELEGRAM_SIGNATURE}"
+    )
 
 
 def should_send_monthly_report():
@@ -2160,13 +2230,11 @@ def should_send_monthly_report():
     now = utc_datetime()
 
     # گزارش ماه قبل در روز اول ماه جدید
-    if now.day != 1:
+    # Recover gracefully if the first scheduled run of the month is delayed.
+    if now.hour < MONTHLY_REPORT_HOUR_UTC:
         return False
 
-    if now.hour != MONTHLY_REPORT_HOUR_UTC:
-        return False
-
-    if now.minute < MONTHLY_REPORT_MINUTE_UTC:
+    if now.hour == MONTHLY_REPORT_HOUR_UTC and now.minute < MONTHLY_REPORT_MINUTE_UTC:
         return False
 
     return True
@@ -2273,30 +2341,42 @@ def weekly_report_text(state, week_string):
         start = utc_datetime() - pd.Timedelta(days=7)
         end = utc_datetime()
     trades = []
-    for t in state.get("closed_trades", []):
+    for trade in state.get("closed_trades", []):
         try:
-            dt = datetime.fromisoformat(str(t.get("exit_time", "")).replace(" UTC", "+00:00"))
+            dt = datetime.fromisoformat(
+                str(trade.get("exit_time", "")).replace(" UTC", "+00:00")
+            )
             if start <= dt < end:
-                trades.append(t)
+                trades.append(trade)
         except Exception:
-            pass
-    opening = float(state["portfolio"].get("period_opening_balances", {}).get(f"WEEK|{week_string}", state["portfolio"]["initial_balance"]))
-    pnl = sum(float(t.get("pnl",0)) for t in trades)
-    closing = opening + pnl
-    wins = sum(1 for t in trades if float(t.get("pnl",0)) > 0)
-    losses = sum(1 for t in trades if float(t.get("pnl",0)) < 0)
-    best = max((float(t.get("pnl", 0)) for t in trades), default=0.0)
-    worst = min((float(t.get("pnl", 0)) for t in trades), default=0.0)
+            continue
+    portfolio = state["portfolio"]
+    opening = float(portfolio.get("period_opening_balances", {}).get(
+        f"WEEK|{week_string}", portfolio.get("initial_balance", STARTING_BALANCE)
+    ))
+    current_balance = float(portfolio.get("balance", STARTING_BALANCE))
+    m = summarize_closed_trades(trades)
+    period_end_balance = opening + m["net"]
     peak, drawdown = portfolio_metrics(state)
-    return (f"📊 گزارش هفتگی\n\n📅 هفته: {week_string} تا {(start + pd.Timedelta(days=6)).strftime('%Y-%m-%d')}\n\n"
-            f"💰 موجودی ابتدای هفته: ${opening:.2f}\n"
-            f"💰 موجودی پایان هفته: ${closing:.2f}\n"
-            f"📈 سود/ضرر هفته: {'+' if pnl >= 0 else ''}${pnl:.2f}\n"
-            f"📊 بازده هفته: {(pnl/opening*100 if opening else 0):.2f}%\n\n"
-            f"📊 معاملات بسته‌شده: {len(trades)}\n"
-            f"✅ سودده: {wins}\n❌ زیان‌ده: {losses}\n"
-            f"🏆 بهترین معامله: ${best:+.2f}\n💥 بدترین معامله: ${worst:+.2f}\n"
-            f"📈 بیشترین موجودی: ${peak:.2f}\n📉 Max Drawdown: {drawdown:.2f}%\n\n{TELEGRAM_SIGNATURE}")
+    return (
+        f"📊 گزارش هفتگی\n\n📅 هفته: {week_string} تا {(start + pd.Timedelta(days=6)).strftime('%Y-%m-%d')}\n\n"
+        f"💰 موجودی ابتدای هفته: ${opening:.2f}\n"
+        f"💰 موجودی پایان هفته بر اساس معاملات همان هفته: ${period_end_balance:.2f}\n"
+        f"💰 موجودی فعلی حساب: ${current_balance:.2f}\n"
+        f"📈 سود ناخالص: ${m['gross']:+.2f}\n"
+        f"💸 مجموع کارمزد: ${m['fees']:.2f}\n"
+        f"💵 سود/ضرر خالص هفته: ${m['net']:+.2f}\n"
+        f"📊 بازده خالص هفته: {(m['net']/opening*100 if opening else 0):.2f}%\n\n"
+        f"📊 معاملات بسته‌شده: {len(trades)}\n"
+        f"🎯 برخوردهای TP (شامل معاملات باز): {count_tp_milestones(state, start=start, end=end)}\n"
+        f"🎯 بسته‌شده با TP: {m['tp_closes']} | 🛑 بسته‌شده با SL: {m['sl_closes']}\n"
+        f"✅ سودده: {m['wins']} | ❌ زیان‌ده: {m['losses']} | ➖ سربه‌سر: {m['breakeven']}\n"
+        f"🎯 درصد برد: {m['win_rate']:.1f}%\n"
+        f"🏆 بهترین معامله خالص: ${m['best']:+.2f}\n"
+        f"💥 بدترین معامله خالص: ${m['worst']:+.2f}\n"
+        f"📈 بیشترین موجودی ثبت‌شده: ${peak:.2f}\n"
+        f"📉 Max Drawdown: {drawdown:.2f}%\n\n{TELEGRAM_SIGNATURE}"
+    )
 
 
 def should_send_weekly_report():
@@ -2307,10 +2387,10 @@ def should_send_weekly_report():
     if now.weekday() != 0:
         return False
 
-    if now.hour != WEEKLY_REPORT_HOUR_UTC:
+    if now.hour < WEEKLY_REPORT_HOUR_UTC:
         return False
 
-    if now.minute < WEEKLY_REPORT_MINUTE_UTC:
+    if now.hour == WEEKLY_REPORT_HOUR_UTC and now.minute < WEEKLY_REPORT_MINUTE_UTC:
         return False
 
     return True
@@ -2409,8 +2489,12 @@ def add_ob_distance(signal, df):
 # =========================================================
 
 def analyze_symbol(state, info, df):
-    check_take_profits(state, info, df)
+    # Conservative same-candle rule:
+    # if the CLOSED 4H candle confirms the active SL, stop wins over any TP
+    # wick touched in that same candle. If SL is not confirmed by Close,
+    # normal TP wick detection continues.
     check_stop(state, info, df)
+    check_take_profits(state, info, df)
 
     signals = latest_signals(df)
     if not signals:
